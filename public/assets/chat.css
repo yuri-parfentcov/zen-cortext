@@ -1,0 +1,597 @@
+/* Zen Cortext — scoped under .zen-cortext-root so it does not leak into the host theme. */
+.zen-cortext-root, .zen-cortext-root * {
+    box-sizing: border-box;
+}
+
+.zen-cortext-root {
+    /* WordPress admin styling defaults.
+       Matches the color palette in /wp-admin/css/colors/_admin.scss so a
+       fresh install drops into the host site looking native to WP. */
+    --zc-accent: #2271b1;
+    --zc-accent-hover: #135e96;
+    --zc-primary: #2271b1;
+    --zc-primary-hover: #135e96;
+    --zc-bg: #ffffff;
+    --zc-surface: #ffffff;
+    --zc-text: #3c434a;
+    --zc-text-strong: #1d2327;
+    --zc-text-muted: #646970;
+    --zc-border: #c3c4c7;
+    --zc-user-bg: var(--zc-primary);
+    --zc-user-text: #ffffff;
+    --zc-assistant-bg: #f0f0f1;
+    --zc-radius: 8px;
+
+    font-family: 'Yanone Kaffeesatz', Arial, Helvetica, sans-serif;
+    font-size: 18px;
+    line-height: 1.2;
+    color: var(--zc-text);
+    background: var(--zc-bg);
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 8px 0 24px;
+}
+
+.zen-cortext-root .zc-hero {
+    padding: 20px 0 18px;
+    text-align: left;
+}
+.zen-cortext-root .zc-hero h2 {
+    font-size: 32px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    color: var(--zc-text-strong);
+    letter-spacing: -0.01em;
+}
+.zen-cortext-root .zc-hero h2 .accent {
+    background: var(--zc-accent);
+    padding: 0 10px;
+    border-radius: 6px;
+}
+.zen-cortext-root .zc-hero p {
+    font-size: 17px;
+    color: var(--zc-text);
+    margin: 0;
+    line-height: 1.4;
+    max-width: 620px;
+}
+
+.zen-cortext-root .zc-chat {
+    padding: 8px 0 0;
+}
+
+.zen-cortext-root .zc-message {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+}
+.zen-cortext-root .zc-message.user { align-items: flex-end; }
+.zen-cortext-root .zc-message.assistant { align-items: flex-start; }
+
+.zen-cortext-root .zc-bubble {
+    max-width: 85%;
+    padding: 14px 18px;
+    border-radius: var(--zc-radius);
+    font-size: 18px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.zen-cortext-root .zc-message.user .zc-bubble {
+    background: var(--zc-user-bg);
+    color: var(--zc-user-text);
+    border-bottom-right-radius: 2px;
+}
+.zen-cortext-root .zc-message.assistant .zc-bubble {
+    background: var(--zc-assistant-bg);
+    color: var(--zc-text);
+    border-bottom-left-radius: 2px;
+    border-left: 3px solid var(--zc-accent);
+}
+.zen-cortext-root .zc-bubble p { margin: 0 0 10px; }
+.zen-cortext-root .zc-bubble p:last-child { margin-bottom: 0; }
+.zen-cortext-root .zc-bubble strong { font-weight: 700; color: var(--zc-text-strong); }
+.zen-cortext-root .zc-bubble em { font-style: italic; }
+.zen-cortext-root .zc-bubble code {
+    background: rgba(100,107,58,0.1);
+    color: var(--zc-primary-hover);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 16px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+.zen-cortext-root .zc-bubble ul, .zen-cortext-root .zc-bubble ol {
+    margin: 6px 0 10px 22px;
+    padding: 0;
+}
+.zen-cortext-root .zc-bubble li { margin-bottom: 4px; }
+.zen-cortext-root .zc-bubble h1,
+.zen-cortext-root .zc-bubble h2,
+.zen-cortext-root .zc-bubble h3 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 14px 0 6px;
+    color: var(--zc-text-strong);
+}
+.zen-cortext-root .zc-bubble h1:first-child,
+.zen-cortext-root .zc-bubble h2:first-child,
+.zen-cortext-root .zc-bubble h3:first-child { margin-top: 0; }
+
+.zen-cortext-root .zc-typing { display: none; margin-bottom: 16px; }
+.zen-cortext-root .zc-typing.active { display: flex; }
+.zen-cortext-root .zc-typing-bubble {
+    background: var(--zc-assistant-bg);
+    border-left: 3px solid var(--zc-accent);
+    border-radius: var(--zc-radius);
+    border-bottom-left-radius: 2px;
+    padding: 16px 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.zen-cortext-root .zc-typing-bubble span {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--zc-primary);
+    display: inline-block;
+    animation: zc-dot-bounce 1.4s infinite both;
+}
+.zen-cortext-root .zc-typing-bubble span:nth-child(2) { animation-delay: 0.2s; }
+.zen-cortext-root .zc-typing-bubble span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes zc-dot-bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-3px); }
+}
+
+.zen-cortext-root .zc-input-area {
+    background: var(--zc-surface);
+    padding: 20px 0 8px;
+}
+
+/* Read-only banner shown when a third party opens a shared chat link. */
+.zen-cortext-root .zc-readonly-notice {
+    background: #fff8e1;
+    border: 1px solid #f1d68b;
+    color: #6b5618;
+    border-radius: var(--zc-radius);
+    padding: 10px 14px;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+.zen-cortext-root .zc-input[readonly],
+.zen-cortext-root .zc-input:disabled {
+    background: #f5f5f0;
+    color: var(--zc-text-muted);
+    cursor: not-allowed;
+}
+
+/* Share-this-conversation pill — appears once the visitor has sent a message. */
+.zen-cortext-root .zc-share {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.zen-cortext-root .zc-share[hidden] { display: none; }
+.zen-cortext-root .zc-share-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #f6f7ee;
+    border: 1px solid var(--zc-accent-hover);
+    color: var(--zc-primary-hover);
+    border-radius: 9999px;
+    padding: 7px 14px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+}
+.zen-cortext-root .zc-share-button:hover {
+    background: var(--zc-accent);
+    border-color: var(--zc-primary);
+}
+.zen-cortext-root .zc-share-button:active { transform: translateY(1px); }
+.zen-cortext-root .zc-share-icon { font-size: 14px; line-height: 1; }
+.zen-cortext-root .zc-share-status {
+    font-size: 13px;
+    color: var(--zc-primary-hover);
+    font-weight: 500;
+}
+
+.zen-cortext-root .zc-delete-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px solid #e5e5e5;
+    color: #6b7280;
+    border-radius: 9999px;
+    padding: 7px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s, transform .1s;
+}
+.zen-cortext-root .zc-delete-button:hover {
+    background: #fff5f5;
+    border-color: #d63638;
+    color: #d63638;
+}
+.zen-cortext-root .zc-delete-button:active { transform: translateY(1px); }
+.zen-cortext-root .zc-delete-button:disabled {
+    opacity: 0.5; cursor: not-allowed;
+}
+.zen-cortext-root .zc-delete-icon { font-size: 13px; line-height: 1; }
+
+/* Invite admin buttons — appear after first message when takeover is enabled. */
+.zen-cortext-root .zc-invite-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: #f6f7ee;
+    border: 1px solid var(--zc-accent-hover);
+    border-radius: var(--zc-radius);
+}
+.zen-cortext-root .zc-invite-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--zc-primary-hover);
+}
+.zen-cortext-root .zc-invite-btn {
+    display: inline-block;
+    padding: 7px 16px;
+    background: var(--zc-primary);
+    color: #fff;
+    border: none;
+    border-radius: 9999px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+}
+.zen-cortext-root .zc-invite-btn:hover { background: var(--zc-primary-hover); }
+.zen-cortext-root .zc-invite-btn:active { transform: translateY(1px); }
+.zen-cortext-root .zc-invite-btn:disabled {
+    opacity: .7; cursor: not-allowed;
+    background: var(--zc-primary);
+}
+/* Online/offline status dots on invite buttons */
+.zen-cortext-root .zc-status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px; vertical-align: middle; flex-shrink: 0;
+}
+.zen-cortext-root .zc-status-online { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,.5); }
+.zen-cortext-root .zc-status-away { background: #eab308; }
+.zen-cortext-root .zc-status-reachable { background: #3b82f6; box-shadow: 0 0 4px rgba(59,130,246,.5); }
+.zen-cortext-root .zc-status-offline { background: #9ca3af; }
+
+/* Invite pending banner — shown after visitor invites, before admin joins. */
+.zen-cortext-root .zc-invite-pending {
+    padding: 12px 16px;
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    border-radius: var(--zc-radius);
+    color: #92400e;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+.zen-cortext-root .zc-invite-pending-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #eab308;
+    margin-right: 8px;
+    vertical-align: middle;
+    animation: zc-pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes zc-pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .5; transform: scale(1.3); }
+}
+.zen-cortext-root .zc-invite-pending-sub {
+    font-size: 13px;
+    color: #a16207;
+    font-weight: 400;
+}
+
+/* Admin mode banner — shown when a human admin has taken over. */
+.zen-cortext-root .zc-admin-banner {
+    padding: 12px 16px;
+    background: #edf4fc;
+    border: 1px solid #b8d6f0;
+    border-radius: var(--zc-radius);
+    color: #1d5a9e;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    margin-bottom: 8px;
+}
+.zen-cortext-root .zc-admin-banner-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+/* Admin messages in visitor chat — blue left border instead of lime. */
+.zen-cortext-root .zc-admin-msg .zc-bubble {
+    border-left: 3px solid #2271b1 !important;
+}
+.zen-cortext-root .zc-admin-name {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #2271b1;
+    margin-bottom: 4px;
+}
+
+.zen-cortext-root .zc-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+.zen-cortext-root .zc-input {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: var(--zc-radius);
+    padding: 14px 18px;
+    font-size: 18px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    max-height: 140px;
+    line-height: 1.3;
+    background: #ffffff;
+    color: var(--zc-text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.zen-cortext-root .zc-input:focus {
+    border-color: var(--zc-primary);
+    box-shadow: 0 0 0 3px rgba(100,107,58,0.15);
+}
+.zen-cortext-root .zc-send {
+    background: var(--zc-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--zc-radius);
+    padding: 14px 32px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background-color 0.2s, transform 0.1s;
+}
+.zen-cortext-root .zc-send:hover:not(:disabled) { background: var(--zc-primary-hover); }
+.zen-cortext-root .zc-send:active:not(:disabled) { transform: translateY(1px); }
+.zen-cortext-root .zc-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.zen-cortext-root .zc-chips {
+    display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0;
+}
+.zen-cortext-root .zc-chip,
+.zen-cortext-root .zc-message-chip {
+    background: var(--zc-accent);
+    border: 1px solid var(--zc-accent-hover);
+    border-radius: 9999px;
+    padding: 10px 18px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--zc-primary-hover);
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s, border-color 0.15s;
+    text-align: left;
+    line-height: 1.3;
+}
+.zen-cortext-root .zc-chip:hover,
+.zen-cortext-root .zc-message-chip:hover {
+    background: var(--zc-accent-hover);
+    border-color: var(--zc-primary);
+}
+.zen-cortext-root .zc-chip:active,
+.zen-cortext-root .zc-message-chip:active { transform: translateY(1px); }
+
+.zen-cortext-root .zc-message-chips {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; max-width: 85%;
+}
+.zen-cortext-root .zc-message-chips.used { opacity: 0.5; pointer-events: none; }
+
+/* Inline survey/interview option chips. Visually identical to the
+   starter chips so a visitor sees the same shape/color across all
+   questions in the interview, not just the first. */
+.zen-cortext-root .zc-survey-options { margin-top: 8px; }
+
+/* Multi-select: chips toggle on click, the "Done" button submits the
+   joined selection. Selected chips get a filled, accented look so the
+   visitor sees what's currently picked. */
+.zen-cortext-root .zc-chip.selected,
+.zen-cortext-root .zc-message-chip.selected,
+.zen-cortext-root .zc-survey-options .zc-message-chip.selected {
+    background: var(--zc-primary, #1f2937);
+    border-color: var(--zc-primary, #1f2937);
+    color: #fff;
+    font-weight: 600;
+}
+/* Done = filled primary so it visually reads as "submit", clearly
+   distinct from the toggleable option chips above it. Mirrors the
+   main send button styling on purpose. */
+.zen-cortext-root .zc-survey-submit {
+    background: var(--zc-primary);
+    border: 1px solid var(--zc-primary);
+    border-radius: 9999px;
+    padding: 10px 22px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s, border-color 0.15s;
+    margin-left: 4px;
+}
+.zen-cortext-root .zc-survey-submit:hover {
+    background: var(--zc-primary-hover);
+    border-color: var(--zc-primary-hover);
+}
+.zen-cortext-root .zc-survey-submit:active { transform: translateY(1px); }
+
+.zen-cortext-root .zc-intro-card {
+    background: #ffffff;
+    border: 1px solid var(--zc-border);
+    border-left: 4px solid var(--zc-accent);
+    border-radius: var(--zc-radius);
+    padding: 22px 24px;
+    margin-bottom: 16px;
+    max-width: 85%;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    animation: zc-card-in 0.3s ease-out;
+}
+@keyframes zc-card-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.zen-cortext-root .zc-intro-top {
+    display: flex; align-items: center; gap: 18px;
+    margin-bottom: 14px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--zc-border);
+}
+.zen-cortext-root .zc-intro-logo img { height: 54px; width: auto; display: block; }
+.zen-cortext-root .zc-intro-meta { flex: 1; min-width: 0; }
+.zen-cortext-root .zc-intro-name {
+    font-size: 22px; font-weight: 700; color: var(--zc-text-strong);
+    line-height: 1.1; margin-bottom: 4px;
+}
+.zen-cortext-root .zc-intro-role { font-size: 16px; color: var(--zc-text-muted); font-weight: 500; }
+.zen-cortext-root .zc-intro-body {
+    font-size: 17px; line-height: 1.4; color: var(--zc-text); margin-bottom: 16px;
+}
+.zen-cortext-root .zc-intro-body :first-child { margin-top: 0; }
+.zen-cortext-root .zc-intro-body :last-child  { margin-bottom: 0; }
+.zen-cortext-root .zc-intro-body p  { margin: 0 0 10px 0; }
+.zen-cortext-root .zc-intro-body ul,
+.zen-cortext-root .zc-intro-body ol { margin: 0 0 10px 22px; padding: 0; }
+.zen-cortext-root .zc-intro-body li { margin: 0 0 4px 0; }
+.zen-cortext-root .zc-intro-body a  { color: var(--zc-primary); text-decoration: underline; }
+.zen-cortext-root .zc-intro-body strong,
+.zen-cortext-root .zc-intro-body b  { font-weight: 700; }
+.zen-cortext-root .zc-intro-actions {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+}
+.zen-cortext-root .zc-intro-link {
+    color: var(--zc-primary);
+    font-weight: 600; font-size: 16px; text-decoration: none;
+    border-bottom: 1px solid var(--zc-accent-hover);
+    padding-bottom: 1px;
+    transition: border-color 0.15s, color 0.15s;
+}
+.zen-cortext-root .zc-intro-link:hover {
+    color: var(--zc-primary-hover); border-bottom-color: var(--zc-primary);
+}
+
+@media (max-width: 600px) {
+    .zen-cortext-root { font-size: 16px; padding: 4px 0 18px; }
+    .zen-cortext-root .zc-hero h2 { font-size: 24px; }
+    .zen-cortext-root .zc-hero p { font-size: 15px; }
+    .zen-cortext-root .zc-bubble { max-width: 92%; font-size: 16px; padding: 12px 14px; }
+    .zen-cortext-root .zc-input { font-size: 16px; padding: 12px 14px; }
+    .zen-cortext-root .zc-send { font-size: 16px; padding: 12px 22px; }
+    .zen-cortext-root .zc-chip,
+    .zen-cortext-root .zc-message-chip { font-size: 14px; padding: 8px 14px; }
+    .zen-cortext-root .zc-intro-card { max-width: 100%; padding: 18px; }
+    .zen-cortext-root .zc-intro-top { gap: 14px; }
+    .zen-cortext-root .zc-intro-logo img { height: 42px; }
+    .zen-cortext-root .zc-intro-name { font-size: 18px; }
+    .zen-cortext-root .zc-intro-role { font-size: 14px; }
+    .zen-cortext-root .zc-intro-body { font-size: 15px; }
+}
+
+/* -----------------------------------------------------------------
+   Inline lead-capture form — rendered as an assistant-style bubble
+   when the AI emits [contact_form] or [invite:Name] against an
+   offline team member. One per chat, locked after submit.
+   ----------------------------------------------------------------- */
+.zen-cortext-root .zc-bubble.zc-lead-form {
+    padding: 16px 18px;
+    background: #f8fbe9;
+    border: 1px solid #dbe6a0;
+}
+.zen-cortext-root .zc-lead-intro {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    color: #3a3f20;
+}
+.zen-cortext-root .zc-lead-form-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.zen-cortext-root .zc-lead-input {
+    padding: 10px 12px;
+    border: 1px solid #c8d177;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 15px;
+    background: #fff;
+    color: #222;
+}
+.zen-cortext-root .zc-lead-input:focus {
+    outline: 2px solid var(--zc-primary, #646B3A);
+    outline-offset: -1px;
+    border-color: var(--zc-primary, #646B3A);
+}
+.zen-cortext-root .zc-lead-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+.zen-cortext-root .zc-lead-submit,
+.zen-cortext-root .zc-lead-invite {
+    appearance: none;
+    border: 0;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+.zen-cortext-root .zc-lead-submit {
+    background: var(--zc-primary, #646B3A);
+    color: #fff;
+}
+.zen-cortext-root .zc-lead-submit:hover:not(:disabled) { background: #4d5230; }
+.zen-cortext-root .zc-lead-invite {
+    background: #fff;
+    color: #3a3f20;
+    border: 1px solid #c8d177;
+}
+.zen-cortext-root .zc-lead-invite:hover:not(:disabled) { background: #eef4cf; }
+.zen-cortext-root .zc-lead-submit:disabled,
+.zen-cortext-root .zc-lead-invite:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+.zen-cortext-root .zc-lead-status {
+    font-size: 13px;
+    color: #6d7a3a;
+    margin-top: 4px;
+    min-height: 1em;
+}
+.zen-cortext-root .zc-bubble.zc-lead-done {
+    background: #eef4cf;
+    border-color: #c8d177;
+}

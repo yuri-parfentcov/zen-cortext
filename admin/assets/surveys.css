@@ -1,0 +1,36 @@
+/* Surveys admin page */
+.zen-cortext-surveys .zca-toolbar { margin: 14px 0 12px 0; }
+
+.zen-cortext-surveys .zca-list { margin-top: 8px; }
+.zen-cortext-surveys .zca-list td { vertical-align: middle; }
+
+.zen-cortext-surveys .zca-editor {
+    margin-top: 24px;
+    padding: 18px 20px 8px 20px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+
+.zen-cortext-surveys .zca-editor h3 { margin-top: 0; }
+.zen-cortext-surveys .zca-editor h4 { margin: 4px 0 6px 0; }
+
+.zen-cortext-surveys .zca-editor-actions {
+    margin-top: 18px;
+    border-top: 1px solid #ebebeb;
+    padding-top: 14px;
+}
+
+.zen-cortext-surveys #zsv-script {
+    font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    background: #fafafa;
+}
+
+.zen-cortext-surveys .zca-status { margin-left: 10px; }
+.zen-cortext-surveys .zca-status.error   { color: #b32d2e; }
+.zen-cortext-surveys .zca-status.success { color: #008a20; }
+
+#zsv-parse-status.error   { color: #b32d2e; font-weight: 500; }
+#zsv-parse-status.success { color: #008a20; }

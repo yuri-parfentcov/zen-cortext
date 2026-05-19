@@ -1,0 +1,33 @@
+<div class="zcp-page">
+
+    <!-- Desktop: floating left rail of quick actions (team cards + site links) -->
+    <aside class="zcp-rail" aria-label="{{ attr:quick_actions_label }}">
+        {{ raw:rail_buttons_html }}
+    </aside>
+
+    <!-- Mobile: floating icon button (opens the modal below) -->
+    <button type="button"
+            class="zcp-mobile-trigger"
+            id="zcp-mobile-trigger"
+            aria-label="{{ attr:mobile_open_label }}"
+            aria-haspopup="dialog"
+            aria-controls="zcp-modal">
+        <img src="{{ url:mobile_trigger_icon }}" alt="" decoding="async" loading="eager">
+    </button>
+
+    <!-- Mobile menu modal — shows the same rail buttons in a centered card -->
+    <div class="zcp-modal" id="zcp-modal" role="dialog" aria-modal="true" aria-labelledby="zcp-modal-title" hidden>
+        <div class="zcp-modal-card">
+            <button type="button" class="zcp-modal-close" id="zcp-modal-close" aria-label="{{ t:Close }}">×</button>
+            <h2 class="zcp-modal-title" id="zcp-modal-title">{{ t:Quick actions }}</h2>
+            <div class="zcp-modal-list">
+                {{ raw:rail_buttons_html }}
+            </div>
+        </div>
+    </div>
+
+    <main class="zcp-main">
+        {{ raw:chat_html }}
+    </main>
+
+</div><!-- /.zcp-page -->

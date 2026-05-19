@@ -1,0 +1,356 @@
+/* Zen Cortext — Chat Editor admin page. */
+.zce-wrap {
+    --zce-bg:        #f6f7ee;
+    --zce-border:    #d9dbcb;
+    --zce-text:      #1f2421;
+    --zce-muted:     #5a604f;
+    --zce-accent:    #646B3A;
+    --zce-accent-fg: #ffffff;
+    margin-right: 20px;
+}
+
+.zce-title { margin: 6px 0 4px; }
+.zce-subtitle { margin: 0 0 16px; color: var(--zce-muted); max-width: 760px; }
+
+.zce-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--zce-border);
+    margin-bottom: 18px;
+}
+.zce-tab {
+    background: transparent;
+    border: 0;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--zce-muted);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+}
+.zce-tab.is-active {
+    color: var(--zce-text);
+    border-bottom-color: var(--zce-accent);
+}
+
+/* ========== Colors panel ========== */
+.zce-colors-grid {
+    display: grid;
+    grid-template-columns: minmax(360px, 480px) 1fr;
+    gap: 24px;
+    align-items: start;
+}
+.zce-colors-list {
+    background: #fff;
+    border: 1px solid var(--zce-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+.zce-color-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f1ec;
+}
+.zce-color-row:last-of-type { border-bottom: 0; }
+.zce-color-label { display: flex; flex-direction: column; gap: 2px; line-height: 1.2; }
+.zce-color-name { font-weight: 500; }
+.zce-color-token { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--zce-muted); }
+.zce-color-controls { display: flex; align-items: center; gap: 8px; }
+.zce-color-picker {
+    width: 36px; height: 28px; padding: 0; border: 1px solid var(--zce-border);
+    border-radius: 4px; cursor: pointer; background: #fff;
+}
+.zce-color-hex {
+    width: 90px; padding: 4px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; border: 1px solid var(--zce-border); border-radius: 4px;
+}
+.zce-color-reset { font-size: 16px; }
+
+.zce-colors-actions {
+    display: flex; align-items: center; gap: 10px; padding: 12px 0 4px; margin-top: 10px;
+    border-top: 1px solid var(--zce-border);
+}
+.zce-colors-status, .zce-save-status { color: var(--zce-muted); font-size: 12px; }
+.zce-colors-status.is-ok, .zce-save-status.is-ok { color: #2c5b1a; }
+.zce-colors-status.is-err, .zce-save-status.is-err { color: #a23030; }
+
+.zce-colors-preview {
+    background: #fff;
+    border: 1px solid var(--zce-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+.zce-preview-title { margin: 0 0 4px; font-size: 14px; }
+.zce-preview-hint { margin: 0 0 14px; font-size: 12px; color: var(--zce-muted); }
+.zce-mini-chat { padding: 12px; background: var(--zc-bg); border-radius: 8px; max-width: 540px; }
+.zce-mini-chat .zc-message { display: flex; margin: 6px 0; }
+.zce-mini-chat .zc-message.user { justify-content: flex-end; }
+.zce-mini-chat .zc-bubble { padding: 8px 12px; border-radius: 8px; max-width: 80%; font-size: 14px; line-height: 1.3; }
+.zce-mini-chat .zc-message.assistant .zc-bubble { background: var(--zc-assistant-bg); color: var(--zc-text); }
+.zce-mini-chat .zc-message.user .zc-bubble { background: var(--zc-user-bg); color: var(--zc-user-text); }
+.zce-mini-chat .zc-input-area { padding: 10px 0 0; }
+.zce-mini-chat .zc-input-row { display: flex; gap: 6px; }
+.zce-mini-chat .zc-input {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--zc-border); background: var(--zc-surface);
+    color: var(--zc-text); border-radius: 6px; font-size: 13px;
+}
+.zce-mini-chat .zc-send {
+    padding: 8px 14px; border: 0; background: var(--zc-olive); color: #fff;
+    border-radius: 6px; font-weight: 600; cursor: default;
+}
+
+/* ========== Help panel ========== */
+.zce-help {
+    background: #fff;
+    border: 1px solid var(--zce-border);
+    border-radius: 8px;
+    padding: 22px 28px 32px;
+    max-width: 920px;
+    line-height: 1.55;
+    color: var(--zce-text);
+}
+.zce-help h2 {
+    font-size: 16px;
+    margin: 28px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--zce-border);
+    color: var(--zce-text);
+}
+.zce-help h2:first-of-type { margin-top: 4px; }
+.zce-help p { margin: 6px 0 12px; }
+.zce-help ol, .zce-help ul { margin: 6px 0 14px 22px; padding: 0; }
+.zce-help li { margin-bottom: 6px; }
+.zce-help code {
+    background: #f6f7ee;
+    border: 1px solid var(--zce-border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--zce-text);
+}
+.zce-help-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0 18px;
+    font-size: 13px;
+}
+.zce-help-table th, .zce-help-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--zce-border);
+}
+.zce-help-table th {
+    background: #fafbf3;
+    font-weight: 600;
+    color: var(--zce-text);
+}
+.zce-help-table td:first-child { white-space: nowrap; }
+.zce-help-pills {
+    list-style: none;
+    margin: 6px 0 14px;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.zce-help-pills li { margin: 0; }
+.zce-help-pills code { font-size: 11.5px; padding: 3px 7px; }
+
+/* ========== Code panel toolbar ========== */
+.zce-code-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    background: #fff;
+    border: 1px solid var(--zce-border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+/* Each label+control pair reads as one inline unit with the label
+ * floated above and to the left. Keeps the row compact and lets
+ * the select sit at the same baseline as the buttons next to it. */
+.zce-toolbar-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--zce-muted);
+    white-space: nowrap;
+}
+.zce-toolbar-field > span {
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10.5px;
+    color: var(--zce-muted);
+}
+
+/* Custom-styled native <select>. Removes the OS chevron and paints our
+ * own SVG so the three dropdowns look identical across browsers and
+ * sit at the same height as the WP buttons next to them. */
+.zce-code-toolbar select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    height: 30px;
+    min-width: 180px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--zce-border);
+    border-radius: 4px;
+    background: #fff
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='%23646B3A' d='M1 1l5 5 5-5'/></svg>")
+        no-repeat right 8px center;
+    background-size: 10px 7px;
+    color: var(--zce-text);
+    font-size: 13px;
+    line-height: 28px;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+}
+.zce-code-toolbar select:hover { border-color: var(--zce-accent); }
+.zce-code-toolbar select:focus {
+    outline: none;
+    border-color: var(--zce-accent);
+    box-shadow: 0 0 0 2px rgba(100, 107, 58, 0.18);
+}
+.zce-code-toolbar select:disabled {
+    background-color: #f5f5f0;
+    color: var(--zce-muted);
+    cursor: not-allowed;
+}
+
+/* Group: Version dropdown + Restore button. Light separator vs the
+ * other toolbar items, no boxed-in feel. */
+.zce-toolbar-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 12px;
+    border-left: 1px solid var(--zce-border);
+}
+.zce-toolbar-field--inline { /* alias kept for backward compat */ }
+
+/* Buttons in the toolbar aligned to the same height as the selects. */
+.zce-code-toolbar .button {
+    height: 30px;
+    line-height: 28px;
+    padding: 0 12px;
+}
+.zce-code-toolbar .button-primary { font-weight: 600; }
+
+.zce-toolbar-spacer { flex: 1; min-width: 0; }
+
+.zce-code-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(360px, 0.9fr);
+    gap: 10px;
+    height: calc(100vh - 260px);
+    min-height: 520px;
+}
+.zce-preview-pane, .zce-ai-pane {
+    background: #fff; border: 1px solid var(--zce-border); border-radius: 8px;
+    overflow: hidden; display: flex; flex-direction: column;
+}
+
+/* When the AI pane is expanded, switch the grid to a single column
+ * and hide the preview. JS toggles `.is-expanded` on the grid itself
+ * (alongside the same flag on the AI pane) so we don't depend on the
+ * CSS :has() selector for parent matching. */
+.zce-code-grid.is-expanded {
+    grid-template-columns: minmax(0, 1fr);
+}
+.zce-code-grid.is-expanded .zce-preview-pane {
+    display: none;
+}
+
+.zce-preview-iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+.zce-preview-pane.has-width-cap { display: flex; align-items: stretch; justify-content: center; padding: 8px; }
+.zce-preview-pane.has-width-cap .zce-preview-iframe { max-width: var(--zce-preview-cap, 100%); margin: 0 auto; }
+
+/* ---- AI pane: header (tabs + expand button) ---- */
+.zce-ai-pane { padding: 0; }
+.zce-ai-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-bottom: 1px solid var(--zce-border);
+    background: #fafbf3;
+}
+.zce-ai-tabs { display: flex; align-items: center; gap: 0; }
+
+/* File picker tucked into the AI-pane header next to the Code tab —
+ * compact, no label, full-name shown in the dropdown options. */
+.zce-ai-file-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    height: 26px;
+    margin-left: 10px;
+    padding: 0 26px 0 10px;
+    border: 1px solid var(--zce-border);
+    border-radius: 4px;
+    background: #fff
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='%23646B3A' d='M1 1l5 5 5-5'/></svg>")
+        no-repeat right 8px center;
+    background-size: 10px 7px;
+    color: var(--zce-text);
+    font-size: 12px;
+    line-height: 24px;
+    cursor: pointer;
+    max-width: 240px;
+}
+.zce-ai-file-select:hover  { border-color: var(--zce-accent); }
+.zce-ai-file-select:focus  { outline: none; border-color: var(--zce-accent); box-shadow: 0 0 0 2px rgba(100,107,58,.18); }
+.zce-ai-tab {
+    background: transparent; border: 0;
+    padding: 6px 12px; font-size: 13px; font-weight: 500;
+    color: var(--zce-muted); cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.zce-ai-tab.is-active { color: var(--zce-text); border-bottom-color: var(--zce-accent); }
+
+.zce-ai-expand {
+    width: 28px; height: 28px; padding: 0;
+    background: transparent; border: 1px solid transparent;
+    border-radius: 4px; cursor: pointer; color: var(--zce-muted);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px; line-height: 1;
+}
+.zce-ai-expand:hover { background: #fff; border-color: var(--zce-border); color: var(--zce-text); }
+.zce-ai-expand::before {
+    content: "⤢"; /* expand glyph */
+    font-size: 16px;
+}
+.zce-ai-pane.is-expanded .zce-ai-expand::before { content: "⤡"; /* collapse glyph */ }
+
+/* ---- AI pane: tab panels ---- */
+.zce-ai-tabpanel {
+    flex: 1; min-height: 0; padding: 12px 14px;
+    display: flex; flex-direction: column;
+}
+.zce-ai-tabpanel[hidden] { display: none; }
+.zce-ai-hint { margin: 0 0 12px; font-size: 12px; color: var(--zce-muted); }
+.zce-ai-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+.zce-ai-msg { padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.35; }
+.zce-ai-msg.user { background: #eef0e0; align-self: stretch; }
+.zce-ai-msg.assistant { background: #f6f7ee; border: 1px solid var(--zce-border); }
+.zce-ai-msg.error { background: #fde8e8; color: #a23030; }
+.zce-ai-msg .zce-ai-summary { font-weight: 600; margin-bottom: 2px; }
+.zce-ai-form { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid #f1f1ec; }
+.zce-ai-input { width: 100%; min-height: 60px; resize: vertical; }
+
+/* ---- AI pane: code panel (textarea / CodeMirror) ---- */
+.zce-ai-tabpanel[data-zce-ai-panel="code"] { padding: 0; }
+.zce-source {
+    width: 100%; height: 100%; min-height: 100%; resize: none; border: 0;
+    padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+}
+.CodeMirror { height: 100% !important; }
