@@ -72,6 +72,13 @@ class Zen_Cortext_Design {
             '--zc-user-bg'       => array('label' => 'User bubble bg',      'default' => '#2271b1'),
             '--zc-user-text'     => array('label' => 'User bubble text',    'default' => '#ffffff'),
             '--zc-assistant-bg'  => array('label' => 'Assistant bubble bg', 'default' => '#f0f0f1'),
+            // Chip text is a dedicated token (not derived from --zc-accent
+            // or --zc-user-text) because palettes differ wildly in chip-
+            // background luminance — a pale-lime accent needs dark text,
+            // a medium-blue accent needs white. Decoupling lets admins
+            // pick the right contrast per palette without it leaking
+            // into the user bubble.
+            '--zc-chip-text'     => array('label' => 'Chip text',           'default' => '#ffffff'),
         );
     }
 
@@ -95,6 +102,23 @@ class Zen_Cortext_Design {
             ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/chat-editor.css',
             array(),
             ZEN_CORTEXT_VERSION
+        );
+
+        // Enqueue the public chat stylesheet too so the Live preview
+        // block uses the same selectors that ship to visitors. Without
+        // this, intro card / chip / share button styles would be invisible
+        // in the preview (chat.css is not loaded in admin by default).
+        // The .zce-mini-chat overrides in chat-editor.css constrain the
+        // size so we still get a compact preview, not the full 760px
+        // chat layout.
+        $chat_css_url = class_exists('Zen_Cortext_Template_Renderer')
+            ? Zen_Cortext_Template_Renderer::asset_url('chat.css')
+            : ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.css?ver=' . ZEN_CORTEXT_VERSION;
+        wp_enqueue_style(
+            'zen-cortext-chat-public',
+            $chat_css_url,
+            array(),
+            null // version already baked into the URL via mtime / plugin version
         );
 
         // WP media uploader for the float-button icon picker — opens

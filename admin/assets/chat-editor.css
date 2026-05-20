@@ -86,22 +86,55 @@
 }
 .zce-preview-title { margin: 0 0 4px; font-size: 14px; }
 .zce-preview-hint { margin: 0 0 14px; font-size: 12px; color: var(--zce-muted); }
-.zce-mini-chat { padding: 12px; background: var(--zc-bg); border-radius: 8px; max-width: 540px; }
-.zce-mini-chat .zc-message { display: flex; margin: 6px 0; }
-.zce-mini-chat .zc-message.user { justify-content: flex-end; }
-.zce-mini-chat .zc-bubble { padding: 8px 12px; border-radius: 8px; max-width: 80%; font-size: 14px; line-height: 1.3; }
-.zce-mini-chat .zc-message.assistant .zc-bubble { background: var(--zc-assistant-bg); color: var(--zc-text); }
-.zce-mini-chat .zc-message.user .zc-bubble { background: var(--zc-user-bg); color: var(--zc-user-text); }
-.zce-mini-chat .zc-input-area { padding: 10px 0 0; }
-.zce-mini-chat .zc-input-row { display: flex; gap: 6px; }
-.zce-mini-chat .zc-input {
-    flex: 1; padding: 8px 10px; border: 1px solid var(--zc-border); background: var(--zc-surface);
-    color: var(--zc-text); border-radius: 6px; font-size: 13px;
+/* Live preview overrides — chat.css is enqueued on the Design tab
+   (so the preview uses the same selectors as the public render), but
+   chat.css's defaults assume a 760px stage and 18px type. The block
+   below constrains the preview to a compact column without forking
+   any color rules — color decisions still flow from the public CSS
+   so what you see here is what the visitor sees.
+
+   Strategy: only override sizing/layout (max-width, padding, font-size,
+   gap), never colors. Where the public render also depends on size
+   (chip padding, bubble padding, send button padding), shrink those
+   here so the preview fits in the admin sidebar. */
+.zen-cortext-root.zce-mini-chat {
+    padding: 14px;
+    margin: 0;
+    max-width: 100%;
+    font-size: 14px;
+    line-height: 1.35;
+    background: var(--zc-bg);
+    border-radius: 8px;
 }
-.zce-mini-chat .zc-send {
-    padding: 8px 14px; border: 0; background: var(--zc-olive); color: #fff;
-    border-radius: 6px; font-weight: 600; cursor: default;
+.zen-cortext-root.zce-mini-chat .zc-bubble { font-size: 14px; padding: 10px 14px; }
+.zen-cortext-root.zce-mini-chat .zc-message { margin-bottom: 8px; }
+.zen-cortext-root.zce-mini-chat .zc-intro-card {
+    padding: 14px; margin: 0 0 12px;
 }
+.zen-cortext-root.zce-mini-chat .zc-intro-logo img { width: 36px; height: 36px; }
+.zen-cortext-root.zce-mini-chat .zc-intro-name { font-size: 15px; }
+.zen-cortext-root.zce-mini-chat .zc-intro-role { font-size: 12px; }
+.zen-cortext-root.zce-mini-chat .zc-intro-body { font-size: 13px; }
+.zen-cortext-root.zce-mini-chat .zc-input { font-size: 13px; padding: 8px 12px; }
+.zen-cortext-root.zce-mini-chat .zc-send { font-size: 13px; padding: 8px 16px; }
+.zen-cortext-root.zce-mini-chat .zc-chip,
+.zen-cortext-root.zce-mini-chat .zc-message-chip {
+    font-size: 13px; padding: 6px 12px;
+}
+.zen-cortext-root.zce-mini-chat .zc-chips { margin: 10px 0 14px; gap: 6px; }
+.zen-cortext-root.zce-mini-chat .zc-message-chips { gap: 6px; margin-top: 8px; }
+.zen-cortext-root.zce-mini-chat .zc-share { gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.zen-cortext-root.zce-mini-chat .zc-share-button,
+.zen-cortext-root.zce-mini-chat .zc-delete-button,
+.zen-cortext-root.zce-mini-chat .zc-email-button {
+    font-size: 12px; padding: 6px 10px;
+}
+.zen-cortext-root.zce-mini-chat .zc-typing-bubble {
+    padding: 8px 12px;
+}
+.zen-cortext-root.zce-mini-chat .zc-hero { padding: 4px 0 10px; }
+.zen-cortext-root.zce-mini-chat .zc-hero h2 { font-size: 20px; margin: 0 0 4px; }
+.zen-cortext-root.zce-mini-chat .zc-hero p { font-size: 13px; }
 
 /* ========== Help panel ========== */
 .zce-help {

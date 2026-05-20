@@ -20,6 +20,7 @@
     --zc-user-bg: var(--zc-primary);
     --zc-user-text: #ffffff;
     --zc-assistant-bg: #f0f0f1;
+    --zc-chip-text: #ffffff;
     --zc-radius: 8px;
 
     font-family: 'Yanone Kaffeesatz', Arial, Helvetica, sans-serif;
@@ -390,7 +391,7 @@
     font-size: 16px;
     font-weight: 500;
     cursor: pointer;
-    color: var(--zc-user-text, #fff);
+    color: var(--zc-chip-text, #fff);
     font-family: inherit;
     transition: background 0.15s, transform 0.1s, border-color 0.15s;
     text-align: left;

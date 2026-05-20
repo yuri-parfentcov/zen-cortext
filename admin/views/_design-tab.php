@@ -194,14 +194,82 @@ $chat_pages = Zen_Cortext_Design::list_chat_pages();
 
         <aside class="zce-colors-preview">
             <h3 class="zce-preview-title"><?php esc_html_e('Live preview', 'zen-cortext'); ?></h3>
-            <p class="zce-preview-hint"><?php esc_html_e('Updates instantly as you adjust pickers — these are the same tokens chat.css uses on the live site.', 'zen-cortext'); ?></p>
+            <p class="zce-preview-hint"><?php esc_html_e('Updates instantly as you adjust pickers — these are the same tokens chat.css uses on the live site. Every styled element of the visitor chat is shown below so you can verify contrast and brand cohesion before saving.', 'zen-cortext'); ?></p>
+            <?php
+            // Pull the saved intro card so the preview reflects the
+            // actual identity card a visitor would see — admins comparing
+            // palettes against their real name + role + body get a more
+            // honest test than against placeholder copy.
+            $preview_intro = (array) get_option('zen_cortext_intro_card', array());
+            $preview_intro = wp_parse_args($preview_intro, Zen_Cortext_Defaults::intro_card());
+            $preview_logo  = !empty($preview_intro['logo_url']) ? $preview_intro['logo_url'] : '';
+            $preview_name  = $preview_intro['name'] ?: get_bloginfo('name');
+            $preview_role  = $preview_intro['role'];
+            $preview_body  = $preview_intro['body'] ?: 'I draw on the published content of this site to answer pre-sales questions — case studies, services, FAQs.';
+            $preview_site  = $preview_intro['site_url'] ?: home_url('/');
+            $preview_disp  = preg_replace('#^https?://#', '', untrailingslashit($preview_site));
+            ?>
             <div class="zen-cortext-root zce-mini-chat">
-                <div class="zc-message assistant"><div class="zc-bubble">Hi — how can I help you today?</div></div>
-                <div class="zc-message user"><div class="zc-bubble">My WooCommerce store is slow under real traffic.</div></div>
-                <div class="zc-message assistant"><div class="zc-bubble">That's the most common complaint we hear — and it almost always points to the origin choking once cache is bypassed.</div></div>
+
+                <div class="zc-hero">
+                    <h2><?php esc_html_e('Talk to a', 'zen-cortext'); ?> <span class="accent"><?php esc_html_e('technical consultant', 'zen-cortext'); ?></span></h2>
+                </div>
+
+                <div class="zc-intro-card" style="opacity:1;">
+                    <div class="zc-intro-top">
+                        <?php if ($preview_logo): ?>
+                            <a href="#" onclick="return false;" class="zc-intro-logo">
+                                <img src="<?php echo esc_url($preview_logo); ?>" alt="">
+                            </a>
+                        <?php endif; ?>
+                        <div class="zc-intro-meta">
+                            <div class="zc-intro-name"><?php echo esc_html($preview_name); ?></div>
+                            <div class="zc-intro-role"><?php echo esc_html($preview_role); ?></div>
+                        </div>
+                    </div>
+                    <div class="zc-intro-body"><p><?php echo esc_html($preview_body); ?></p></div>
+                    <div class="zc-intro-actions">
+                        <a href="#" onclick="return false;" class="zc-intro-link"><?php echo esc_html($preview_disp); ?> &#8599;</a>
+                    </div>
+                </div>
+
+                <div class="zc-message assistant"><div class="zc-bubble"><?php esc_html_e('Hi — how can I help you today?', 'zen-cortext'); ?></div></div>
+                <div class="zc-message user"><div class="zc-bubble"><?php esc_html_e('My WooCommerce store is slow under real traffic.', 'zen-cortext'); ?></div></div>
+                <div class="zc-message assistant">
+                    <div class="zc-bubble"><?php esc_html_e('That\'s the most common complaint we hear — and it almost always points to the origin choking once cache is bypassed. Which path do you want to dig into?', 'zen-cortext'); ?></div>
+                    <div class="zc-message-chips">
+                        <button type="button" class="zc-message-chip"><?php esc_html_e('Diagnose the bottleneck', 'zen-cortext'); ?></button>
+                        <button type="button" class="zc-message-chip selected"><?php esc_html_e('See a case like ours', 'zen-cortext'); ?></button>
+                        <button type="button" class="zc-message-chip"><?php esc_html_e('Get a quote', 'zen-cortext'); ?></button>
+                    </div>
+                </div>
+
+                <div class="zc-typing" style="display:flex;">
+                    <div class="zc-typing-bubble"><span></span><span></span><span></span></div>
+                </div>
+
                 <div class="zc-input-area">
+                    <div class="zc-share">
+                        <button type="button" class="zc-share-button">
+                            <span class="zc-share-icon">🔗</span>
+                            <span class="zc-share-label"><?php esc_html_e('Save this conversation', 'zen-cortext'); ?></span>
+                        </button>
+                        <button type="button" class="zc-email-button">
+                            <span class="zc-email-icon">✉</span>
+                            <span class="zc-email-label"><?php esc_html_e('Email me a copy', 'zen-cortext'); ?></span>
+                        </button>
+                        <button type="button" class="zc-delete-button">
+                            <span class="zc-delete-icon">🗑</span>
+                            <span class="zc-delete-label"><?php esc_html_e('Delete', 'zen-cortext'); ?></span>
+                        </button>
+                    </div>
+                    <div class="zc-chips" style="display:flex;">
+                        <button type="button" class="zc-chip">📋 <?php esc_html_e('What services do you offer?', 'zen-cortext'); ?></button>
+                        <button type="button" class="zc-chip">💰 <?php esc_html_e('How does pricing work?', 'zen-cortext'); ?></button>
+                        <button type="button" class="zc-chip selected">📞 <?php esc_html_e('Talk to a human', 'zen-cortext'); ?></button>
+                    </div>
                     <div class="zc-input-row">
-                        <textarea class="zc-input" rows="1" placeholder="Describe your situation..."></textarea>
+                        <textarea class="zc-input" rows="1" placeholder="<?php esc_attr_e('Describe your situation...', 'zen-cortext'); ?>"></textarea>
                         <button class="zc-send"><?php esc_html_e('Send', 'zen-cortext'); ?></button>
                     </div>
                 </div>
