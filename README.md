@@ -2,6 +2,8 @@
 
 **An AI sales consultant for your WordPress site that answers from YOUR content, not generic AI knowledge.**
 
+![The visitor chat in action](docs/screenshots/visitor-chat.png)
+
 Zen Cortext turns your published pages, posts, FAQs, and case studies into a knowledge base that Claude reads from. Visitors get a streaming chat that cites your real work — not made-up advice. Conversations stay in your WordPress database. Your team gets notified when someone's ready to talk. You bring your own Anthropic API key, so there's no SaaS subscription on top.
 
 - **Trained on your site automatically** — one click indexes everything you've published, classifies it, and restructures it into a clean format the AI can quote.
@@ -31,13 +33,22 @@ Zen Cortext turns your published pages, posts, FAQs, and case studies into a kno
 ### For you (the admin)
 
 - **Knowledge Base** — one-click indexer that pulls in your pages, posts, FAQs, portfolio items. Classifies each entry into a content type (case study, technical article, service page, FAQ) and restructures it into a clean format the AI can cite confidently. Re-syncs automatically when you publish or edit content.
+
+  ![Knowledge Base admin](docs/screenshots/admin-knowledge-base.png)
+
 - **Knowledge Artifacts** — hand-curated structured documents (case studies, internal positioning notes, technical specs) that complement the auto-indexed Knowledge Base.
 - **Brainstorm** — an admin-only AI collaborator with full access to your Knowledge Base + artifacts. Use it to draft new content, ideate campaign angles, write outlines.
 - **Live takeover** — jump into any visitor conversation in real time from the admin (or a mobile PWA) when the AI escalates.
 - **Saved Chats** — read every conversation your site has had, with full attribution (which campaign brought the visitor in), the AI's reasoning, and any leads captured.
+
+  ![Saved Chats admin](docs/screenshots/admin-saved-chats.png)
+
 - **Surveys** — build interview scripts the AI runs through naturally — qualifying questions, intake forms, custom flows.
 - **Attribution Context** — swap the AI's framing per campaign. Visitors arriving from your "speed audit" ad see different positioning than visitors from "ad agency hire" ads.
 - **Design** — 13 brand color tokens with a live preview, base font / size picker, configurable float button (position, color, icon, hover text).
+
+  ![Design tab with live preview](docs/screenshots/admin-design.png)
+
 - **Prompts** — full control over the AI's persona (system prompt), opening line, and survey framing. An "Adapt to my KB" button drafts a site-tailored prompt suggestion.
 - **Team members** — pick who can be invited into chats, who receives lead notifications, who gets AI-error alerts. Each member gets a profile card with avatar, WhatsApp, LinkedIn, and role.
 - **Webhooks** — fire outbound notifications on `lead.captured`, `chat.started`, `admin.joined`, and more to your CRM, Slack, Zapier, or anything that accepts a POST.
@@ -98,6 +109,8 @@ We don't quote specific dollar amounts because Anthropic adjusts pricing periodi
 2. Go to **Plugins** in your WordPress admin and activate **Zen Cortext**.
 3. WordPress redirects you to the **Getting Started** page on first activation.
 4. Follow the steps in order. The page tracks your progress and shows a ✓ next to completed steps.
+
+![The Getting Started admin page](docs/screenshots/admin-getting-started.png)
 
 You can return to Getting Started any time from the **Zen Cortext → Getting Started** menu in the WP admin sidebar.
 
