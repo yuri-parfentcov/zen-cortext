@@ -43,7 +43,7 @@
     text-align: left;
 }
 .zen-cortext-root .zc-hero h2 {
-    font-size: 32px;
+    font-size: 2em;
     font-weight: 600;
     margin: 0 0 8px;
     color: var(--zc-text-strong);
@@ -55,7 +55,7 @@
     border-radius: 6px;
 }
 .zen-cortext-root .zc-hero p {
-    font-size: 17px;
+    font-size: 1.0625em;
     color: var(--zc-text);
     margin: 0;
     line-height: 1.4;
@@ -106,7 +106,7 @@
     color: var(--zc-primary-hover);
     padding: 2px 6px;
     border-radius: 4px;
-    font-size: 16px;
+    font-size: 1em;
     font-family: 'SF Mono', Menlo, Consolas, monospace;
 }
 .zen-cortext-root .zc-bubble ul, .zen-cortext-root .zc-bubble ol {
@@ -117,7 +117,7 @@
 .zen-cortext-root .zc-bubble h1,
 .zen-cortext-root .zc-bubble h2,
 .zen-cortext-root .zc-bubble h3 {
-    font-size: 22px;
+    font-size: 1.375em;
     font-weight: 600;
     margin: 14px 0 6px;
     color: var(--zc-text-strong);
@@ -163,7 +163,7 @@
     color: #6b5618;
     border-radius: var(--zc-radius);
     padding: 10px 14px;
-    font-size: 14px;
+    font-size: 0.875em;
     margin-bottom: 12px;
 }
 .zen-cortext-root .zc-input[readonly],
@@ -192,7 +192,7 @@
     border-radius: 9999px;
     padding: 7px 14px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 0.875em;
     font-weight: 500;
     cursor: pointer;
     transition: background .15s, border-color .15s, transform .1s;
@@ -202,9 +202,9 @@
     border-color: var(--zc-primary);
 }
 .zen-cortext-root .zc-share-button:active { transform: translateY(1px); }
-.zen-cortext-root .zc-share-icon { font-size: 14px; line-height: 1; }
+.zen-cortext-root .zc-share-icon { font-size: 0.875em; line-height: 1; }
 .zen-cortext-root .zc-share-status {
-    font-size: 13px;
+    font-size: 0.8125em;
     color: var(--zc-primary-hover);
     font-weight: 500;
 }
@@ -219,7 +219,7 @@
     border-radius: 9999px;
     padding: 7px 12px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 0.8125em;
     font-weight: 500;
     cursor: pointer;
     transition: background .15s, border-color .15s, color .15s, transform .1s;
@@ -233,7 +233,7 @@
 .zen-cortext-root .zc-delete-button:disabled {
     opacity: 0.5; cursor: not-allowed;
 }
-.zen-cortext-root .zc-delete-icon { font-size: 13px; line-height: 1; }
+.zen-cortext-root .zc-delete-icon { font-size: 0.8125em; line-height: 1; }
 
 /* "Email me a copy" — third button in the .zc-share row. Styled like the
    share button (positive action, primary palette) but with a distinct icon
@@ -248,7 +248,7 @@
     border-radius: 9999px;
     padding: 7px 12px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 0.8125em;
     font-weight: 500;
     cursor: pointer;
     transition: background .15s, border-color .15s, color .15s, transform .1s;
@@ -261,7 +261,7 @@
 .zen-cortext-root .zc-email-button:disabled {
     opacity: 0.5; cursor: not-allowed;
 }
-.zen-cortext-root .zc-email-icon { font-size: 13px; line-height: 1; }
+.zen-cortext-root .zc-email-icon { font-size: 0.8125em; line-height: 1; }
 
 /* Inline email form — revealed when the visitor clicks "Email me a copy".
    Matches the .zc-share row's flex layout so it sits naturally underneath. */
@@ -280,7 +280,7 @@
     border: 1px solid var(--zc-border);
     border-radius: 9999px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 0.875em;
     color: var(--zc-text);
     background: var(--zc-surface);
 }
@@ -295,7 +295,7 @@
     color: #fff;
     border-radius: 9999px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 0.8125em;
     font-weight: 500;
     cursor: pointer;
     transition: background .15s, border-color .15s;
@@ -314,12 +314,12 @@
     color: var(--zc-text-muted);
     border-radius: 9999px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 0.8125em;
     cursor: pointer;
 }
 .zen-cortext-root .zc-email-cancel:hover { color: var(--zc-text); }
 .zen-cortext-root .zc-email-status {
-    font-size: 13px;
+    font-size: 0.8125em;
     color: var(--zc-primary-hover);
     font-weight: 500;
 }
@@ -337,7 +337,7 @@
     border-radius: var(--zc-radius);
 }
 .zen-cortext-root .zc-invite-label {
-    font-size: 14px;
+    font-size: 0.875em;
     font-weight: 500;
     color: var(--zc-primary-hover);
 }
@@ -349,7 +349,7 @@
     border: none;
     border-radius: 9999px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 0.875em;
     font-weight: 600;
     cursor: pointer;
     transition: background .15s, transform .1s;
@@ -377,7 +377,7 @@
     border: 1px solid #fde68a;
     border-radius: var(--zc-radius);
     color: #92400e;
-    font-size: 14px;
+    font-size: 0.875em;
     font-weight: 500;
     text-align: center;
     margin-bottom: 8px;
@@ -397,7 +397,7 @@
     50% { opacity: .5; transform: scale(1.3); }
 }
 .zen-cortext-root .zc-invite-pending-sub {
-    font-size: 13px;
+    font-size: 0.8125em;
     color: #a16207;
     font-weight: 400;
 }
@@ -409,7 +409,7 @@
     border: 1px solid #b8d6f0;
     border-radius: var(--zc-radius);
     color: #1d5a9e;
-    font-size: 14px;
+    font-size: 0.875em;
     font-weight: 500;
     text-align: center;
     margin-bottom: 8px;
@@ -428,7 +428,7 @@
     border-left: 3px solid #2271b1 !important;
 }
 .zen-cortext-root .zc-admin-name {
-    font-size: 11px;
+    font-size: 0.6875em;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .04em;
@@ -527,7 +527,7 @@
     border: 1px solid #fecaca;
     color: #991b1b;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 0.8125em;
     display: none;
 }
 
@@ -540,7 +540,7 @@
     border: 1px solid var(--zc-accent-hover);
     border-radius: 9999px;
     padding: 10px 18px;
-    font-size: 16px;
+    font-size: 1em;
     font-weight: 500;
     cursor: pointer;
     color: var(--zc-chip-text, #fff);
@@ -578,6 +578,39 @@
     color: var(--zc-primary-hover);
 }
 
+/* Multi-select option chips: click toggles selected state. Selected
+   chips get a filled, accented look so the visitor sees what's picked. */
+.zen-cortext-root .zc-chip.selected,
+.zen-cortext-root .zc-message-chip.selected,
+.zen-cortext-root .zc-survey-options .zc-message-chip.selected {
+    background: var(--zc-primary, #1f2937);
+    border-color: var(--zc-primary, #1f2937);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* "Done" submit pill for multi-select survey questions — filled primary
+   so it visually reads as a submit, distinct from the toggleable option
+   chips above it. Mirrors the main send button styling on purpose. */
+.zen-cortext-root .zc-survey-submit {
+    background: var(--zc-primary);
+    border: 1px solid var(--zc-primary);
+    border-radius: 9999px;
+    padding: 10px 22px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s, border-color 0.15s;
+    margin-left: 4px;
+}
+.zen-cortext-root .zc-survey-submit:hover {
+    background: var(--zc-primary-hover);
+    border-color: var(--zc-primary-hover);
+}
+.zen-cortext-root .zc-survey-submit:active { transform: translateY(1px); }
+
 .zen-cortext-root .zc-intro-card {
     background: #ffffff;
     border: 1px solid var(--zc-border);
@@ -601,12 +634,12 @@
 .zen-cortext-root .zc-intro-logo img { height: 54px; width: auto; display: block; }
 .zen-cortext-root .zc-intro-meta { flex: 1; min-width: 0; }
 .zen-cortext-root .zc-intro-name {
-    font-size: 22px; font-weight: 700; color: var(--zc-text-strong);
+    font-size: 1.375em; font-weight: 700; color: var(--zc-text-strong);
     line-height: 1.1; margin-bottom: 4px;
 }
-.zen-cortext-root .zc-intro-role { font-size: 16px; color: var(--zc-text-muted); font-weight: 500; }
+.zen-cortext-root .zc-intro-role { font-size: 1em; color: var(--zc-text-muted); font-weight: 500; }
 .zen-cortext-root .zc-intro-body {
-    font-size: 17px; line-height: 1.4; color: var(--zc-text); margin-bottom: 16px;
+    font-size: 1.0625em; line-height: 1.4; color: var(--zc-text); margin-bottom: 16px;
 }
 .zen-cortext-root .zc-intro-body :first-child { margin-top: 0; }
 .zen-cortext-root .zc-intro-body :last-child  { margin-bottom: 0; }
@@ -622,7 +655,7 @@
 }
 .zen-cortext-root .zc-intro-link {
     color: var(--zc-primary);
-    font-weight: 600; font-size: 16px; text-decoration: none;
+    font-weight: 600; font-size: 1em; text-decoration: none;
     border-bottom: 1px solid var(--zc-accent-hover);
     padding-bottom: 1px;
     transition: border-color 0.15s, color 0.15s;
@@ -632,20 +665,24 @@
 }
 
 @media (max-width: 600px) {
-    .zen-cortext-root { font-size: 16px; padding: 4px 0 18px; }
-    .zen-cortext-root .zc-hero h2 { font-size: 24px; }
-    .zen-cortext-root .zc-hero p { font-size: 15px; }
-    .zen-cortext-root .zc-bubble { max-width: 92%; font-size: 16px; padding: 12px 14px; }
-    .zen-cortext-root .zc-input { font-size: 16px; padding: 12px 14px; }
-    .zen-cortext-root .zc-send { font-size: 16px; padding: 12px 22px; }
+    /* Mobile: only override padding here. Font size is driven by
+       --zc-font-size (Design tab picker) or inherited from body; the
+       child rules below use em so they scale with whichever base
+       wins. Hardcoding 16px here used to defeat the picker on mobile. */
+    .zen-cortext-root { padding: 4px 0 18px; }
+    .zen-cortext-root .zc-hero h2 { font-size: 1.5em; }
+    .zen-cortext-root .zc-hero p { font-size: 0.9375em; }
+    .zen-cortext-root .zc-bubble { max-width: 92%; font-size: 1em; padding: 12px 14px; }
+    .zen-cortext-root .zc-input { font-size: 1em; padding: 12px 14px; }
+    .zen-cortext-root .zc-send { font-size: 1em; padding: 12px 22px; }
     .zen-cortext-root .zc-chip,
-    .zen-cortext-root .zc-message-chip { font-size: 14px; padding: 8px 14px; }
+    .zen-cortext-root .zc-message-chip { font-size: 0.875em; padding: 8px 14px; }
     .zen-cortext-root .zc-intro-card { max-width: 100%; padding: 18px; }
     .zen-cortext-root .zc-intro-top { gap: 14px; }
     .zen-cortext-root .zc-intro-logo img { height: 42px; }
-    .zen-cortext-root .zc-intro-name { font-size: 18px; }
-    .zen-cortext-root .zc-intro-role { font-size: 14px; }
-    .zen-cortext-root .zc-intro-body { font-size: 15px; }
+    .zen-cortext-root .zc-intro-name { font-size: 1.125em; }
+    .zen-cortext-root .zc-intro-role { font-size: 0.875em; }
+    .zen-cortext-root .zc-intro-body { font-size: 0.9375em; }
 }
 
 /* -----------------------------------------------------------------
@@ -660,7 +697,7 @@
 }
 .zen-cortext-root .zc-lead-intro {
     margin: 0 0 12px 0;
-    font-size: 15px;
+    font-size: 0.9375em;
     color: #3a3f20;
 }
 .zen-cortext-root .zc-lead-form-inner {
@@ -673,7 +710,7 @@
     border: 1px solid #c8d177;
     border-radius: 8px;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 0.9375em;
     background: #fff;
     color: #222;
 }
@@ -695,7 +732,7 @@
     padding: 10px 16px;
     border-radius: 8px;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 0.9375em;
     font-weight: 600;
     cursor: pointer;
     transition: background-color .15s, color .15s;
@@ -717,7 +754,7 @@
     cursor: not-allowed;
 }
 .zen-cortext-root .zc-lead-status {
-    font-size: 13px;
+    font-size: 0.8125em;
     color: #6d7a3a;
     margin-top: 4px;
     min-height: 1em;

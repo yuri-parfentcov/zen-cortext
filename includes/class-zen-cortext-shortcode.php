@@ -167,16 +167,12 @@ class Zen_Cortext_Shortcode {
         $font_size = (int) get_option('zen_cortext_font_size', 0);
         if ($font_size > 0 && $font_size <= 64) {
             $token_rules[] = '--zc-font-size:' . $font_size . 'px;';
-            // Hit every element that's set to a literal font-size in the
-            // pre-2.34.7 chat.css. Without these, sites that haven't
-            // re-seeded their writable chat.css see no change when they
-            // move the picker.
-            $direct_rules .= '.zen-cortext-root,'
-                          . '.zen-cortext-root .zc-bubble,'
-                          . '.zen-cortext-root .zc-input,'
-                          . '.zen-cortext-root .zc-send,'
-                          . '.zen-cortext-root .zc-bubble code'
-                          . '{font-size:' . $font_size . 'px;}';
+            // chat.css uses em throughout for chat-internal elements
+            // (post-2.34.9 refactor). Setting font-size on .zen-cortext-root
+            // is enough — every child scales proportionally via em. This
+            // rule sits in the override <style> printed after chat.css,
+            // so it wins on cascade order at the same specificity.
+            $direct_rules .= '.zen-cortext-root{font-size:' . $font_size . 'px;}';
         }
 
         if (!$token_rules && $direct_rules === '') return '';
