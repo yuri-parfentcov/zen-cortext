@@ -379,7 +379,7 @@
 .zen-cortext-root .zc-send:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .zen-cortext-root .zc-chips {
-    display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0;
+    display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 22px;
 }
 .zen-cortext-root .zc-chip,
 .zen-cortext-root .zc-message-chip {
@@ -390,7 +390,7 @@
     font-size: 16px;
     font-weight: 500;
     cursor: pointer;
-    color: var(--zc-primary-hover);
+    color: var(--zc-user-text, #fff);
     font-family: inherit;
     transition: background 0.15s, transform 0.1s, border-color 0.15s;
     text-align: left;

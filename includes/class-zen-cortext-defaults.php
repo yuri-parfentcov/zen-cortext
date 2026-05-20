@@ -100,10 +100,11 @@ class Zen_Cortext_Defaults {
 
     /**
      * Side-rail quick links shown next to the visitor chat (desktop
-     * left rail / mobile menu modal). Two generic defaults: main site
-     * link with a "Main site:" prefix label, and a "Case studies"
-     * link pointing at /projects/ (the conventional location). Admins
-     * add / remove / reorder rows via the Chat settings UI.
+     * left rail / mobile menu modal). One generic default — the site's
+     * home URL — because no other link is universally meaningful on a
+     * fresh install (a "Case studies" → /projects/ row used to ship,
+     * but it 404s on most installs and looked broken). Admins add the
+     * rest via the Chat settings UI.
      *
      * Shape mirrors Zen_Cortext_Admin::sanitize_quick_links — each row:
      *   icon   : string (emoji or short unicode)
@@ -121,13 +122,6 @@ class Zen_Cortext_Defaults {
                 'label'  => $site_label,
                 'url'    => $site_home,
                 'prefix' => __('Main site:', 'zen-cortext'),
-                'target' => '_blank',
-            ),
-            array(
-                'icon'   => '📁',
-                'label'  => __('Case studies', 'zen-cortext'),
-                'url'    => home_url('/projects/'),
-                'prefix' => '',
                 'target' => '_blank',
             ),
         );
