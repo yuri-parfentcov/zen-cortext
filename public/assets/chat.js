@@ -2080,6 +2080,33 @@
                                 sendBtn.disabled = false;
                                 return; // exit the whole send() function
                             }
+                            // AI returned an error (billing, rate limit,
+                            // outage, transport, bad key, …). The server
+                            // already emailed the admin team with details;
+                            // here we replace whatever partial bubble we
+                            // had with a clean "out of service" message
+                            // and open the lead-capture form so the
+                            // visitor isn't stranded.
+                            if (event.type === 'service_unavailable' || event.type === 'error') {
+                                typing.classList.remove('active');
+                                if (bubble) {
+                                    const msgDiv = bubble.closest('.zc-message');
+                                    if (msgDiv && msgDiv.parentNode) {
+                                        msgDiv.parentNode.removeChild(msgDiv);
+                                    }
+                                    bubble = null;
+                                }
+                                const fallback = event.message ||
+                                    'The AI consultant is currently unavailable. Leave your contact below and our team will follow up shortly.';
+                                addMessage('assistant', fallback);
+                                if (typeof renderLeadForm === 'function') renderLeadForm(null);
+                                streaming = false;
+                                sendBtn.disabled = false;
+                                if (typeof console !== 'undefined' && event.error) {
+                                    console.error('[zen-cortext] AI service unavailable:', event.error);
+                                }
+                                return;
+                            }
                             if (event.type === 'content_block_delta' && event.delta && event.delta.text) {
                                 assistantText += event.delta.text;
                                 if (!bubble) bubble = addMessage('assistant', '');

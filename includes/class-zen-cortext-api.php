@@ -731,6 +731,15 @@ class Zen_Cortext_API {
         $assistant_buffer = '';
         $sse_tail = '';
 
+        // HTTP status + error-body buffering. The visitor stream is piped
+        // straight through CURLOPT_WRITEFUNCTION — when Anthropic returns
+        // a 4xx (insufficient credits, rate limit, invalid key, …) the
+        // raw JSON error would otherwise echo into the chat as garbage.
+        // We capture the status line in CURLOPT_HEADERFUNCTION, then gate
+        // the echo in WRITEFUNCTION on status < 400.
+        $response_status = 0;
+        $error_body      = '';
+
         $ch = curl_init(self::ENDPOINT);
         curl_setopt_array($ch, array(
             CURLOPT_POST           => true,
@@ -740,8 +749,24 @@ class Zen_Cortext_API {
                 'x-api-key: ' . self::api_key(),
                 'anthropic-version: ' . self::ANTHROPIC_VERSION,
             ),
-            CURLOPT_WRITEFUNCTION  => function($ch, $data) use (&$assistant_buffer, &$sse_tail, $chat_uid) {
-                // Always pass through to the client first.
+            CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$response_status) {
+                // Each response can have multiple status lines (redirects);
+                // the last one wins. Parse "HTTP/1.1 429 Too Many Requests".
+                if (preg_match('#^HTTP/\S+\s+(\d{3})\b#', $header, $m)) {
+                    $response_status = (int) $m[1];
+                }
+                return strlen($header);
+            },
+            CURLOPT_WRITEFUNCTION  => function($ch, $data) use (&$assistant_buffer, &$sse_tail, &$error_body, &$response_status, $chat_uid) {
+                // 4xx/5xx: do NOT pass-through to the visitor. Buffer the
+                // body so the post-exec block can extract a clean message
+                // and email the admin instead of leaking JSON to the chat.
+                if ($response_status >= 400) {
+                    $error_body .= $data;
+                    return strlen($data);
+                }
+
+                // Happy path: pass straight to the client.
                 echo $data;
                 if (ob_get_level()) @ob_flush();
                 @flush();
@@ -776,8 +801,35 @@ class Zen_Cortext_API {
 
         curl_exec($ch);
 
+        // Detect every failure path: transport (curl_errno), bad HTTP
+        // status, or success that produced no assistant text. Each one
+        // emits the same `service_unavailable` SSE event for the JS to
+        // act on (replace bubble with fallback + auto-open lead form)
+        // and triggers a throttled admin email so the team learns about
+        // outages immediately. Without this, errors used to either echo
+        // raw JSON to the chat or silently produce an empty bubble.
+        $service_error_msg = '';
         if (curl_errno($ch)) {
-            echo "data: " . wp_json_encode(array('type' => 'error', 'error' => curl_error($ch))) . "\n\n";
+            $service_error_msg = 'transport: ' . curl_error($ch);
+        } elseif ($response_status >= 400) {
+            $service_error_msg = 'Anthropic ' . $response_status . ': ' . self::extract_anthropic_error_message($error_body, $response_status);
+        }
+
+        if ($service_error_msg !== '') {
+            error_log('Zen Cortext stream_chat error — ' . $service_error_msg);
+            self::notify_admin_ai_error(array(
+                'http_status' => $response_status,
+                'error'       => $service_error_msg,
+                'raw_body'    => $error_body,
+                'model'       => self::model(),
+                'chat_uid'    => $chat_uid,
+                'last_user'   => self::last_user_message($messages),
+            ));
+            echo "data: " . wp_json_encode(array(
+                'type'    => 'service_unavailable',
+                'error'   => $service_error_msg, // for client-side logging only; the visitor sees `message`
+                'message' => __('The AI consultant is currently unavailable. Leave your contact below and our team will follow up shortly.', 'zen-cortext'),
+            )) . "\n\n";
             @flush();
         }
 
@@ -942,6 +994,159 @@ class Zen_Cortext_API {
             if (isset($decoded['error']['type']))    return (string) $decoded['error']['type'];
         }
         return substr($body, 0, 300);
+    }
+
+    /**
+     * Pull the last user message out of a messages array — used in the
+     * admin error email so the team can see what the visitor was asking
+     * when the AI failed. Returns an empty string if no user turn found.
+     */
+    private static function last_user_message($messages) {
+        if (!is_array($messages)) return '';
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            $m = $messages[$i];
+            if (!empty($m['role']) && $m['role'] === 'user' && !empty($m['content'])) {
+                return substr((string) $m['content'], 0, 2000);
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Notify the admin team when the AI consultant fails — billing /
+     * rate-limit / API outage / bad key / transport. Throttled to one
+     * email per ERROR_EMAIL_THROTTLE_SEC so a sustained outage doesn't
+     * spam the team inbox. Recipients come from zen_cortext_invitable_users
+     * (the same pool that receives lead notifications); falls back to
+     * the site's admin_email if no invitable users are configured.
+     *
+     * $payload keys:
+     *   http_status, error, raw_body, model, chat_uid, last_user
+     */
+    public static function notify_admin_ai_error($payload) {
+        $throttle = (int) apply_filters('zen_cortext_ai_error_email_throttle_sec', 1800);
+        $last_at  = (int) get_transient('zen_cortext_ai_error_email_at');
+        if ($last_at > 0 && (time() - $last_at) < $throttle) {
+            error_log('Zen Cortext: AI error email throttled (last sent ' . (time() - $last_at) . 's ago)');
+            return false;
+        }
+
+        $recipients = self::ai_error_email_recipients();
+        if (!$recipients) {
+            error_log('Zen Cortext: AI error — no admin recipients configured, email skipped.');
+            return false;
+        }
+
+        $status     = isset($payload['http_status']) ? (int) $payload['http_status'] : 0;
+        $err        = isset($payload['error'])       ? (string) $payload['error']    : '';
+        $raw_body   = isset($payload['raw_body'])    ? (string) $payload['raw_body'] : '';
+        $model      = isset($payload['model'])       ? (string) $payload['model']    : '';
+        $chat_uid   = isset($payload['chat_uid'])    ? (string) $payload['chat_uid'] : '';
+        $last_user  = isset($payload['last_user'])   ? (string) $payload['last_user']: '';
+
+        $site_name  = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
+        $short_err  = $status > 0 ? ($status . ' ' . self::http_status_label($status)) : 'transport failure';
+        $subject    = '[' . $site_name . '] AI consultant error — ' . $short_err;
+
+        $chat_link = '';
+        if ($chat_uid !== '') {
+            $chat_link = admin_url('admin.php?page=zen-cortext-chats&chat=' . rawurlencode($chat_uid));
+        }
+
+        $rows = array(
+            'When'         => wp_date('Y-m-d H:i:s T'),
+            'HTTP status'  => $status > 0 ? (string) $status : '— (transport-level error)',
+            'Error'        => $err,
+            'Model'        => $model,
+            'Chat UID'     => $chat_uid !== '' ? $chat_uid : '—',
+            'Last visitor message' => $last_user !== '' ? $last_user : '—',
+        );
+
+        $body  = '<p>The AI consultant returned an error while serving a visitor. The visitor was shown a "service unavailable" message and an inline contact form so the conversation continues even while this is broken.</p>';
+        $body .= '<h3 style="margin-bottom:6px;">Error details</h3>';
+        $body .= '<table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse;border-color:#ddd;font-family:system-ui,sans-serif;font-size:14px;">';
+        foreach ($rows as $k => $v) {
+            $body .= '<tr><th align="left" style="background:#f6f6f6;width:160px;">' . esc_html($k) . '</th>'
+                  .  '<td style="word-break:break-word;">' . esc_html((string) $v) . '</td></tr>';
+        }
+        $body .= '</table>';
+
+        if ($raw_body !== '') {
+            $body .= '<h3 style="margin-top:18px;margin-bottom:6px;">Raw response body (truncated)</h3>';
+            $body .= '<pre style="background:#f6f6f6;border:1px solid #ddd;padding:10px;white-space:pre-wrap;word-break:break-word;font-size:12px;">'
+                  .  esc_html(substr($raw_body, 0, 4000))
+                  .  '</pre>';
+        }
+
+        $body .= '<h3 style="margin-top:18px;margin-bottom:6px;">Common causes</h3>';
+        $body .= '<ul>';
+        $body .= '<li><b>401 / authentication_error</b> — API key invalid or revoked. Reissue at console.anthropic.com.</li>';
+        $body .= '<li><b>402 / billing</b> — workspace out of credit. Top up the Anthropic balance.</li>';
+        $body .= '<li><b>429 / rate_limit_error</b> — hitting org or model rate limits. Wait or request a limit increase.</li>';
+        $body .= '<li><b>500 / 529 / overloaded_error</b> — Anthropic-side outage. Usually transient; check status.anthropic.com.</li>';
+        $body .= '<li><b>Transport error</b> — server can\'t reach api.anthropic.com (DNS, firewall, TLS).</li>';
+        $body .= '</ul>';
+
+        if ($chat_link !== '') {
+            $body .= '<p style="margin-top:18px;"><a href="' . esc_url($chat_link) . '">Open this chat in the admin</a></p>';
+        }
+        $body .= '<p style="color:#777;font-size:12px;margin-top:18px;">Further error emails are throttled to one per ' . (int) $throttle . ' seconds.</p>';
+
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+            'From: ' . $site_name . ' <' . get_option('admin_email') . '>',
+        );
+
+        $sent_any = false;
+        foreach ($recipients as $to) {
+            if (wp_mail($to, $subject, $body, $headers)) $sent_any = true;
+        }
+        if ($sent_any) {
+            set_transient('zen_cortext_ai_error_email_at', time(), $throttle);
+        }
+        return $sent_any;
+    }
+
+    /**
+     * Build the recipient list for AI-error emails. Prefers the team
+     * members in zen_cortext_invitable_users (same pool the lead form
+     * notifies); falls back to the site admin_email if the team list
+     * is empty so a fresh install isn't silent.
+     */
+    private static function ai_error_email_recipients() {
+        $emails = array();
+        $ids = (array) get_option('zen_cortext_invitable_users', array());
+        foreach ($ids as $uid) {
+            $u = get_userdata((int) $uid);
+            if ($u && !empty($u->user_email) && is_email($u->user_email)) {
+                $emails[$u->user_email] = true;
+            }
+        }
+        if (!$emails) {
+            $fallback = (string) get_option('admin_email', '');
+            if (is_email($fallback)) $emails[$fallback] = true;
+        }
+        return array_keys($emails);
+    }
+
+    /** Short human label for the HTTP statuses Anthropic returns. */
+    private static function http_status_label($status) {
+        $map = array(
+            400 => 'Bad Request',
+            401 => 'Unauthorized',
+            402 => 'Payment Required',
+            403 => 'Forbidden',
+            404 => 'Not Found',
+            408 => 'Request Timeout',
+            413 => 'Payload Too Large',
+            429 => 'Too Many Requests',
+            500 => 'Internal Server Error',
+            502 => 'Bad Gateway',
+            503 => 'Service Unavailable',
+            504 => 'Gateway Timeout',
+            529 => 'Overloaded',
+        );
+        return isset($map[$status]) ? $map[$status] : 'HTTP error';
     }
 
     /**
