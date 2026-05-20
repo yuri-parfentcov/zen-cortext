@@ -78,25 +78,52 @@ class Zen_Cortext_Defaults {
             // option table and the get_option fallback never gets used.
             'zen_cortext_sessions_enabled'              => true,
             'zen_cortext_sessions_gdpr_compliant'       => false,
-            // WP-native font stack on fresh installs — the previous
-            // default was "Yanone Kaffeesatz" (Zen Republic's brand
-            // font), which felt off-brand on any other site. The
-            // migration in Zen_Cortext::init() detects pre-existing
-            // installs by checking the writable chat.css and keeps
-            // their Yanone — only NEW installs get the system stack.
+            // Typography — both default to '' so the chat inherits the
+            // host theme's body font + size on shortcode embeds.
+            // Admins who want a specific look pick them in Design tab.
+            // Standalone /talk/ pages (no host theme to inherit from)
+            // use the system-stack + 16px fallbacks in chat-page.php.
+            //
+            // The font migration in Zen_Cortext::init() preserves
+            // 'Yanone Kaffeesatz' on pre-2.34.5 installs that had it
+            // hardcoded in the writable chat.css, by writing the
+            // explicit Yanone value into the option on first run.
             'zen_cortext_font_family'                   => self::font_family(),
+            'zen_cortext_font_size'                     => self::font_size(),
         );
     }
 
     /**
-     * Default chat font family. Matches the WordPress admin font stack
-     * (see /wp-admin/css/forms.css) so a fresh install drops into the
-     * host site looking native to WP. Plain string — admins paste a
-     * full CSS font-family value into the Design tab if they want a
-     * custom font.
+     * Default chat font family — empty string. Empty means "inherit
+     * from host theme" on shortcode embeds. The standalone /talk/
+     * chat page substitutes font_family_standalone_fallback() when
+     * the option is empty (no theme to inherit from there).
      */
     public static function font_family() {
+        return '';
+    }
+
+    /**
+     * System-stack fallback used by the standalone /talk/ chat page
+     * (and the chat editor preview) when the font_family option is
+     * empty. Mirrors the WP admin font (see /wp-admin/css/forms.css).
+     */
+    public static function font_family_standalone_fallback() {
         return "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen-Sans, Ubuntu, Cantarell, \"Helvetica Neue\", sans-serif";
+    }
+
+    /**
+     * Default chat base font size — empty string. Empty means inherit
+     * from host theme. Standalone /talk/ falls back to 16px (was 18px
+     * pre-2.34.7; user feedback was "too large").
+     */
+    public static function font_size() {
+        return '';
+    }
+
+    /** Standalone /talk/ fallback for base font size (px). */
+    public static function font_size_standalone_fallback() {
+        return 16;
     }
 
     /**

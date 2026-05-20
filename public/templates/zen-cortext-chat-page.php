@@ -161,18 +161,24 @@ $buttons_html = ob_get_clean();
 <title><?php echo esc_html(wp_get_document_title()); ?></title>
 
 <?php
-// Font family — saved per-site (`zen_cortext_font_family`). Fresh installs
-// default to a WP-native system stack (no remote font fetch); existing
-// sites that ran Yanone Kaffeesatz pre-2.34.5 get migrated to the
-// explicit Yanone value via Zen_Cortext::init(), so their look is
-// preserved without a hardcoded brand font in plugin source.
+// Typography — both options default to '' (empty = "inherit from host
+// theme"). Standalone /talk/ has no host theme, so an empty option
+// substitutes the system-stack / 16px fallback declared in Defaults.
 //
-// The Google Fonts <link> is only emitted when the saved value mentions
-// Yanone — case-insensitive sniff so admins typing 'Yanone Kaffeesatz'
-// in any casing still get the font file. Other custom font stacks (the
-// admin's own brand font, hosted via a font CDN, or system fonts) just
-// don't trigger the Google Fonts preconnect.
-$chat_font_family = (string) get_option('zen_cortext_font_family', Zen_Cortext_Defaults::font_family());
+// The Google Fonts <link> is only emitted when the resolved value
+// mentions Yanone — case-insensitive sniff so admins typing
+// 'Yanone Kaffeesatz' in any casing still get the font file.
+// Other font stacks (system, brand-CDN, etc.) skip the preconnect.
+$chat_font_family_opt = trim((string) get_option('zen_cortext_font_family', ''));
+$chat_font_family     = $chat_font_family_opt !== ''
+    ? $chat_font_family_opt
+    : Zen_Cortext_Defaults::font_family_standalone_fallback();
+
+$chat_font_size_opt = (int) get_option('zen_cortext_font_size', 0);
+$chat_font_size_px  = $chat_font_size_opt > 0
+    ? $chat_font_size_opt
+    : Zen_Cortext_Defaults::font_size_standalone_fallback();
+
 $load_yanone_font = (stripos($chat_font_family, 'Yanone Kaffeesatz') !== false);
 ?>
 <?php if ($load_yanone_font): ?>
@@ -198,8 +204,8 @@ body.zcp-body {
        fresh installs without saved color overrides still look right. */
     background: var(--zc-bg, #ffffff) !important;
     color: var(--zc-text, #3c434a);
-    font-family: <?php echo wp_strip_all_tags($chat_font_family); // CSS context — strip tags only ?>;
-    font-size: 18px;
+    font-family: <?php echo wp_strip_all_tags($chat_font_family); ?>;
+    font-size: <?php echo (int) $chat_font_size_px; ?>px;
     line-height: 1.2;
     min-height: 100dvh;
 }

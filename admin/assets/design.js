@@ -10,8 +10,77 @@
         var root = document.getElementById('zen-cortext-design');
         if (!root) return;
         initColorsPanel(root);
+        initTypographyPanel(root);
         initFloatButton(root);
     });
+
+    /* ============================================================
+       Typography panel — base font-family + base font-size
+       ============================================================ */
+    function initTypographyPanel(root) {
+        var familyInp = document.getElementById('zcty-font-family');
+        var sizeInp   = document.getElementById('zcty-font-size');
+        var saveBtn   = document.getElementById('zcty-save');
+        var clearBtn  = document.getElementById('zcty-clear');
+        var statusEl  = document.getElementById('zcty-status');
+        if (!familyInp || !sizeInp || !saveBtn) return;
+
+        var miniChat = root.querySelector('.zce-mini-chat');
+
+        // Live preview: write/unset --zc-font-family and --zc-font-size on
+        // the mini-chat root so the admin sees the typography change
+        // before saving. Empty input = unset the variable so the preview
+        // falls back to the chat.css default (inherit from host page,
+        // which in the admin context is wp-admin's font).
+        function applyPreview() {
+            if (!miniChat) return;
+            var fam = familyInp.value.trim();
+            if (fam) miniChat.style.setProperty('--zc-font-family', fam);
+            else     miniChat.style.removeProperty('--zc-font-family');
+
+            var sz = parseInt(sizeInp.value, 10);
+            if (sz > 0) miniChat.style.setProperty('--zc-font-size', sz + 'px');
+            else        miniChat.style.removeProperty('--zc-font-size');
+        }
+        familyInp.addEventListener('input', applyPreview);
+        sizeInp.addEventListener('input', applyPreview);
+        applyPreview();
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                familyInp.value = '';
+                sizeInp.value   = '';
+                applyPreview();
+            });
+        }
+
+        saveBtn.addEventListener('click', function () {
+            var payload = {
+                font_family: familyInp.value,
+                font_size:   parseInt(sizeInp.value, 10) || 0
+            };
+            setStatus(statusEl, 'Saving…', '');
+            var url = cfg.restRoot + '/typography';
+            url += (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now();
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce':   cfg.restNonce
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (res.ok && res.body && res.body.saved) {
+                    setStatus(statusEl, '✓ Saved', 'is-ok');
+                } else {
+                    setStatus(statusEl, '✗ Save failed', 'is-err');
+                }
+            })
+            .catch(function () { setStatus(statusEl, '✗ Network error', 'is-err'); });
+        });
+    }
 
     function initColorsPanel(root) {
         var rows     = root.querySelectorAll('.zce-color-row');

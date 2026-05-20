@@ -147,6 +147,12 @@ class Zen_Cortext_Design {
             'restNonce'       => wp_create_nonce('wp_rest'),
             'colorTokens'     => self::color_tokens(),
             'savedColors'     => (object) (array) get_option('zen_cortext_chat_colors', array()),
+            'typography'      => array(
+                'font_family'         => (string) get_option('zen_cortext_font_family', ''),
+                'font_size'           => (int)    get_option('zen_cortext_font_size', 0),
+                'font_family_default' => Zen_Cortext_Defaults::font_family_standalone_fallback(),
+                'font_size_default'   => Zen_Cortext_Defaults::font_size_standalone_fallback(),
+            ),
             'floatButton'     => self::get_float_button(),
             'floatDefaults'   => self::float_button_defaults(),
             'chatPageOptions' => $page_options,
@@ -170,6 +176,40 @@ class Zen_Cortext_Design {
             'methods'             => 'POST',
             'callback'            => array($this, 'rest_save_float_button'),
             'permission_callback' => $admin_only,
+        ));
+        register_rest_route('zen-cortext/v1', '/design/typography', array(
+            'methods'             => 'POST',
+            'callback'            => array($this, 'rest_save_typography'),
+            'permission_callback' => $admin_only,
+        ));
+    }
+
+    /**
+     * Persist Design-tab typography picks. Both fields are optional —
+     * empty/0 means "inherit from host theme" (chat.css uses
+     * var(--zc-font-*, inherit)). Sanitization is strict because the
+     * font-family value lands in an inline <style> on every public page.
+     */
+    public function rest_save_typography($request) {
+        $raw_family = trim((string) $request->get_param('font_family'));
+        $raw_size   = (int) $request->get_param('font_size');
+
+        // font_family: strip CSS-breaking characters but preserve quotes,
+        // commas, and spaces so a value like `"Helvetica Neue", Arial,
+        // sans-serif` passes through intact.
+        $clean_family = Zen_Cortext_Shortcode::sanitize_font_family($raw_family);
+
+        // font_size: cap at 64px (anything larger is almost certainly a
+        // mistake) and floor at 0 (interpreted as "inherit").
+        $clean_size = ($raw_size > 0 && $raw_size <= 64) ? $raw_size : 0;
+
+        update_option('zen_cortext_font_family', $clean_family);
+        update_option('zen_cortext_font_size',   $clean_size);
+
+        return rest_ensure_response(array(
+            'saved'       => true,
+            'font_family' => $clean_family,
+            'font_size'   => $clean_size,
         ));
     }
 

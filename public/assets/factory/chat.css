@@ -23,13 +23,13 @@
     --zc-chip-text: #ffffff;
     --zc-radius: 8px;
 
-    /* WP-native font stack — matches /wp-admin/css/forms.css so a fresh
-       install drops into the host site looking native to WP. Existing
-       sites that ran 'Yanone Kaffeesatz' pre-2.34.5 keep it via the
-       writable chat.css copy in uploads/, which the renderer prefers
-       when present. */
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    font-size: 18px;
+    /* Typography — defaults inherit from the host theme on shortcode
+       embeds so the chat blends with whatever font + size the host
+       page uses. Admins who want explicit control pick a font-family
+       and a base font-size on the Design tab; their picks land here
+       as the --zc-font-family / --zc-font-size CSS variables. */
+    font-family: var(--zc-font-family, inherit);
+    font-size: var(--zc-font-size, inherit);
     line-height: 1.2;
     color: var(--zc-text);
     background: var(--zc-bg);
@@ -78,7 +78,10 @@
     max-width: 85%;
     padding: 14px 18px;
     border-radius: var(--zc-radius);
-    font-size: 18px;
+    /* 1em = scale with the chat's own base size (set on .zen-cortext-root,
+       which inherits from host theme or the Design-tab picker). Falls
+       back to 1em even if --zc-font-size is unset. */
+    font-size: var(--zc-font-size, 1em);
     line-height: 1.35;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -443,7 +446,7 @@
     border: 1px solid #ccc;
     border-radius: var(--zc-radius);
     padding: 14px 18px;
-    font-size: 18px;
+    font-size: var(--zc-font-size, 1em);
     font-family: inherit;
     resize: none;
     outline: none;
@@ -463,7 +466,7 @@
     border: none;
     border-radius: var(--zc-radius);
     padding: 14px 32px;
-    font-size: 18px;
+    font-size: var(--zc-font-size, 1em);
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;

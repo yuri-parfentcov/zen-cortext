@@ -133,19 +133,36 @@ class Zen_Cortext_Shortcode {
 
     /**
      * Build the inline <style> tag that overrides --zc-* tokens from the
-     * zen_cortext_chat_colors option. Returns an empty string when the
-     * option is empty so the published chat.css defaults stand alone.
+     * zen_cortext_chat_colors option AND the typography options
+     * (zen_cortext_font_family / zen_cortext_font_size). Returns an
+     * empty string when nothing is configured so the published chat.css
+     * defaults stand alone.
      */
     public static function build_color_override_style() {
-        $colors = (array) get_option('zen_cortext_chat_colors', array());
-        if (empty($colors)) return '';
         $rules = array();
+
+        // Color tokens — one --zc-* rule per saved palette pick.
+        $colors = (array) get_option('zen_cortext_chat_colors', array());
         foreach ($colors as $token => $value) {
             $token = self::sanitize_token_name($token);
             $value = self::sanitize_token_value($value);
             if ($token === '' || $value === '') continue;
             $rules[] = $token . ':' . $value . ';';
         }
+
+        // Typography — emit --zc-font-family / --zc-font-size only when
+        // the admin has picked something. Empty option = inherit from
+        // host theme; the chat.css default rules (var(--zc-font-*, inherit))
+        // do the right thing on their own.
+        $font_family = trim((string) get_option('zen_cortext_font_family', ''));
+        if ($font_family !== '') {
+            $rules[] = '--zc-font-family:' . self::sanitize_font_family($font_family) . ';';
+        }
+        $font_size = (int) get_option('zen_cortext_font_size', 0);
+        if ($font_size > 0 && $font_size <= 64) {
+            $rules[] = '--zc-font-size:' . $font_size . 'px;';
+        }
+
         if (!$rules) return '';
         // Emit at :root AND .zen-cortext-root so tokens cascade to chrome
         // that sits OUTSIDE the chat scope — the standalone chat page's
@@ -156,6 +173,18 @@ class Zen_Cortext_Shortcode {
         // Vars are namespaced with --zc- so emitting at :root cannot
         // collide with host-theme styles.
         return '<style id="zen-cortext-color-overrides">:root,.zen-cortext-root{' . implode('', $rules) . '}</style>';
+    }
+
+    /**
+     * Sanitize a CSS font-family value before echoing into a <style>.
+     * Strips anything that could break out of the property value:
+     * semicolons, closing braces, angle brackets, newlines, backslashes.
+     * Whitelisted set keeps font names with quotes/commas/spaces.
+     */
+    public static function sanitize_font_family($value) {
+        $value = (string) $value;
+        $value = preg_replace('/[;}<>\\\\\r\n]/', '', $value);
+        return trim($value);
     }
 
     /**

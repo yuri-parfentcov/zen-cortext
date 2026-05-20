@@ -162,6 +162,61 @@ $chat_pages = Zen_Cortext_Design::list_chat_pages();
     </p>
 </section>
 
+<?php
+// Typography section — both inputs default to empty so a blank state
+// means "inherit from host theme". The fallbacks shown as placeholders
+// are what the standalone /talk/ chat page uses when nothing is set.
+$ty_font_family   = (string) get_option('zen_cortext_font_family', '');
+$ty_font_size     = (int)    get_option('zen_cortext_font_size', 0);
+$ty_family_ph     = Zen_Cortext_Defaults::font_family_standalone_fallback();
+$ty_size_ph       = Zen_Cortext_Defaults::font_size_standalone_fallback();
+?>
+<section class="zce-panel zcd-section zcd-typography">
+    <h2 class="zcd-section-title"><?php esc_html_e('Typography', 'zen-cortext'); ?></h2>
+    <p class="zcd-section-hint">
+        <?php esc_html_e('Leave both empty so the chat inherits the host theme\'s font and base size — that\'s the recommended default. Fill them in when the theme\'s font doesn\'t fit the chat (display fonts, unusual sizes) or when you need a specific brand font.', 'zen-cortext'); ?>
+        <br>
+        <?php esc_html_e('The standalone /talk/ chat page has no theme to inherit from; it falls back to a WordPress-native system font stack and 16px when these fields are empty.', 'zen-cortext'); ?>
+    </p>
+    <table class="form-table" role="presentation">
+        <tr>
+            <th><label for="zcty-font-family"><?php esc_html_e('Base font', 'zen-cortext'); ?></label></th>
+            <td>
+                <input type="text"
+                       id="zcty-font-family"
+                       class="regular-text"
+                       value="<?php echo esc_attr($ty_font_family); ?>"
+                       placeholder="<?php echo esc_attr($ty_family_ph); ?>"
+                       spellcheck="false" />
+                <p class="description">
+                    <?php esc_html_e('Any CSS font-family value. Empty = use the host theme\'s body font.', 'zen-cortext'); ?>
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="zcty-font-size"><?php esc_html_e('Base font size', 'zen-cortext'); ?></label></th>
+            <td>
+                <input type="number"
+                       id="zcty-font-size"
+                       min="10"
+                       max="64"
+                       step="1"
+                       value="<?php echo $ty_font_size > 0 ? (int) $ty_font_size : ''; ?>"
+                       placeholder="<?php echo (int) $ty_size_ph; ?>" />
+                <span style="margin-left:6px;">px</span>
+                <p class="description">
+                    <?php esc_html_e('Empty = inherit from host theme. Affects message bubbles, the input field, and the send button. Other elements (page title, intro card name) use their own sizes.', 'zen-cortext'); ?>
+                </p>
+            </td>
+        </tr>
+    </table>
+    <p>
+        <button type="button" class="button button-primary" id="zcty-save"><?php esc_html_e('Save Typography', 'zen-cortext'); ?></button>
+        <button type="button" class="button" id="zcty-clear" title="<?php esc_attr_e('Clear both fields back to inherit', 'zen-cortext'); ?>"><?php esc_html_e('Clear', 'zen-cortext'); ?></button>
+        <span class="zce-colors-status" id="zcty-status" aria-live="polite"></span>
+    </p>
+</section>
+
 <section class="zce-panel" data-zce-panel="colors">
     <h2 class="zcd-section-title"><?php esc_html_e('Colors', 'zen-cortext'); ?></h2>
     <div class="zce-colors-grid">
