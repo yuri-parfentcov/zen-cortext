@@ -178,14 +178,17 @@ html, body { margin: 0; padding: 0; }
 *, *::before, *::after { box-sizing: border-box; }
 
 body.zcp-body {
-    background: #ffffff !important;
-    color: #333333;
+    /* !important keeps a host theme's body rule from overriding the
+       chat page's own background — fallback matches chat.css :root so
+       fresh installs without saved color overrides still look right. */
+    background: var(--zc-bg, #ffffff) !important;
+    color: var(--zc-text, #3c434a);
     font-family: 'Yanone Kaffeesatz', Arial, Helvetica, sans-serif;
     font-size: 18px;
     line-height: 1.2;
     min-height: 100dvh;
 }
-.zcp-page { min-height: 100dvh; display: flex; flex-direction: column; background: #ffffff; }
+.zcp-page { min-height: 100dvh; display: flex; flex-direction: column; background: var(--zc-bg, #ffffff); }
 
 /* ----- Main (chat container) — no header / no footer chrome ----- */
 .zcp-main {
@@ -194,7 +197,7 @@ body.zcp-body {
     max-width: 950px;
     margin: 0 auto;
     padding: 32px 24px;
-    background: #ffffff;
+    background: var(--zc-bg, #ffffff);
 }
 /* On desktop, keep the chat clear of the floating left rail (rail width 300px
    + 24px left offset + 24px gap = 348px). On wide enough viewports the chat
@@ -235,8 +238,8 @@ body.zcp-body {
     flex-direction: column;
     gap: 10px;
     padding: 16px;
-    background: #ffffff;
-    border: 1px solid #e5e5e5;
+    background: var(--zc-surface, #ffffff);
+    border: 1px solid var(--zc-border, #c3c4c7);
     border-radius: 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
@@ -247,7 +250,7 @@ body.zcp-body {
 }
 .zcp-team-role {
     font-size: 16px;
-    color: #555;
+    color: var(--zc-text-muted, #646970);
     line-height: 1.35;
 }
 a.zcp-team-left, .zcp-team-left {
@@ -269,7 +272,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
 .zcp-team-name {
     font-size: 16px;
     font-weight: 600;
-    color: #000;
+    color: var(--zc-text-strong, #1d2327);
     line-height: 1.2;
     text-align: center;
     max-width: 86px;
@@ -319,26 +322,30 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
 }
 .zcp-team-toast.zcp-show { opacity: 1; }
 
-/* --- Quick link buttons --- */
+/* --- Quick link buttons ---
+   No left-border stripe — the previous 3px olive stripe was hardcoded
+   to one palette and the user has rejected left-stripe accents on
+   cards in general. Hover swaps the full border to --zc-accent so the
+   brand color still lands on interaction without committing one side
+   of the card to a palette-specific value. */
 .zcp-rail-btn {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 13px 18px;
-    background: #ffffff;
-    border: 1px solid #e5e5e5;
-    border-left: 3px solid #DBEB7E;
+    background: var(--zc-surface, #ffffff);
+    border: 1px solid var(--zc-border, #c3c4c7);
     border-radius: 10px;
     text-decoration: none;
-    color: #333333;
+    color: var(--zc-text, #3c434a);
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     transition: background-color .15s, border-color .15s, transform .12s, box-shadow .15s;
     font-family: inherit;
     line-height: 1.2;
 }
 .zcp-rail-btn:hover {
-    background: #f6f7ee;
-    border-left-color: #646B3A;
+    background: var(--zc-assistant-bg, #f0f0f1);
+    border-color: var(--zc-accent, #2271b1);
     box-shadow: 0 4px 14px rgba(0,0,0,0.08);
     transform: translateX(2px);
 }
@@ -351,12 +358,12 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
 .zcp-rail-btn-label {
     font-size: 18px;
     font-weight: 600;
-    color: #000000;
+    color: var(--zc-text-strong, #1d2327);
 }
 .zcp-rail-btn-prefix {
     font-weight: 400;
     font-size: 16px;
-    color: #6b7280;
+    color: var(--zc-text-muted, #646970);
 }
 
 /* =====================================================================
@@ -372,8 +379,8 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     width: 52px;
     height: 52px;
     padding: 0;
-    background: #ffffff;
-    border: 1px solid #e5e5e5;
+    background: var(--zc-surface, #ffffff);
+    border: 1px solid var(--zc-border, #c3c4c7);
     border-radius: 50%;
     box-shadow: 0 4px 12px rgba(0,0,0,0.10);
     cursor: pointer;
@@ -403,7 +410,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
 .zcp-modal-card {
     width: 100%;
     max-width: 420px;
-    background: #ffffff;
+    background: var(--zc-surface, #ffffff);
     border-radius: 14px;
     padding: 18px 18px 22px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.20);
@@ -413,7 +420,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     font-size: 20px;
     font-weight: 600;
     margin: 4px 0 14px;
-    color: #000000;
+    color: var(--zc-text-strong, #1d2327);
     padding-right: 36px;
 }
 .zcp-modal-close {
@@ -425,7 +432,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     border-radius: 50%;
     border: 0;
     background: transparent;
-    color: #6b7280;
+    color: var(--zc-text-muted, #646970);
     font-size: 26px;
     line-height: 1;
     cursor: pointer;
@@ -434,10 +441,10 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     justify-content: center;
     transition: background-color .12s, color .12s;
 }
-.zcp-modal-close:hover { background: #f0f0f1; color: #1d2327; }
+.zcp-modal-close:hover { background: var(--zc-assistant-bg, #f0f0f1); color: var(--zc-text-strong, #1d2327); }
 .zcp-modal-list { display: flex; flex-direction: column; gap: 12px; }
 .zcp-modal-list .zcp-rail-btn { width: 100%; }
-.zcp-modal-list .zcp-team-card { box-shadow: none; border: 1px solid #eee; }
+.zcp-modal-list .zcp-team-card { box-shadow: none; border: 1px solid var(--zc-border, #c3c4c7); }
 
 /* ----- Breakpoint: switch from desktop rail to mobile trigger ----- */
 @media (max-width: 899px) {

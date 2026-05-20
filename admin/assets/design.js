@@ -76,6 +76,9 @@
         // Selectors are ordered most-specific-first so a `.zc-chip.selected`
         // match wins over the plain `.zc-chip` rule below it.
         var HOVER_MAP = [
+            { sel: '.zcp-rail-btn-prefix',                          tokens: ['--zc-text-muted'] },
+            { sel: '.zcp-rail-btn-label',                           tokens: ['--zc-text-strong'] },
+            { sel: '.zcp-rail-btn',                                 tokens: ['--zc-surface', '--zc-border', '--zc-text', '--zc-accent', '--zc-assistant-bg'] },
             { sel: '.zc-chip.selected, .zc-message-chip.selected',  tokens: ['--zc-primary', '--zc-chip-text'] },
             { sel: '.zc-chip, .zc-message-chip',                    tokens: ['--zc-accent', '--zc-accent-hover', '--zc-chip-text'] },
             { sel: '.zc-send',                                      tokens: ['--zc-primary', '--zc-primary-hover'] },

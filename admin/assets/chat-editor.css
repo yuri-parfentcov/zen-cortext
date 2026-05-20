@@ -147,6 +147,51 @@
 .zen-cortext-root.zce-mini-chat .zc-hero h2 { font-size: 20px; margin: 0 0 4px; }
 .zen-cortext-root.zce-mini-chat .zc-hero p { font-size: 13px; }
 
+/* Left-rail card preview — chat-page.php's inline <style> isn't loaded
+   in admin, so the preview duplicates the rail-btn rules here. Kept
+   in lockstep with .zcp-rail-btn in zen-cortext-chat-page.php — same
+   token references, same hover behavior, just visually compact for the
+   preview column. .zce-preview-rail provides the label + frame. */
+.zen-cortext-root.zce-mini-chat .zce-preview-rail {
+    margin: 0 0 14px;
+}
+.zen-cortext-root.zce-mini-chat .zce-preview-rail-label {
+    display: block; font-size: 11px; color: #50575e;
+    text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+    margin-bottom: 6px;
+}
+.zen-cortext-root.zce-mini-chat .zcp-rail-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--zc-surface, #ffffff);
+    border: 1px solid var(--zc-border, #c3c4c7);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--zc-text, #3c434a);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    transition: background-color .15s, border-color .15s;
+    font-family: inherit;
+    line-height: 1.2;
+    cursor: default;
+}
+.zen-cortext-root.zce-mini-chat .zcp-rail-btn:hover {
+    background: var(--zc-assistant-bg, #f0f0f1);
+    border-color: var(--zc-accent, #2271b1);
+}
+.zen-cortext-root.zce-mini-chat .zcp-rail-btn-icon {
+    font-size: 18px; line-height: 1; flex-shrink: 0;
+}
+.zen-cortext-root.zce-mini-chat .zcp-rail-btn-label {
+    font-size: 14px; font-weight: 600;
+    color: var(--zc-text-strong, #1d2327);
+    display: flex; flex-direction: column;
+}
+.zen-cortext-root.zce-mini-chat .zcp-rail-btn-prefix {
+    font-weight: 400; font-size: 12px;
+    color: var(--zc-text-muted, #646970);
+    display: block; margin-bottom: 1px;
+}
+
 /* ========== Help panel ========== */
 .zce-help {
     background: #fff;

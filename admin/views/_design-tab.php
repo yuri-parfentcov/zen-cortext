@@ -211,6 +211,32 @@ $chat_pages = Zen_Cortext_Design::list_chat_pages();
             ?>
             <div class="zen-cortext-root zce-mini-chat">
 
+                <?php
+                // Left-rail card sample — uses the live saved quick_links
+                // so admins comparing palettes see their actual rail UI.
+                // The chat-page CSS for .zcp-rail-btn isn't loaded in
+                // admin, so we inline a compact equivalent below that
+                // mirrors the same token references (--zc-surface, etc.)
+                // and the same hover behavior. Drop-in HTML so the JS
+                // hover-map can match these elements like any other.
+                $preview_links = (array) get_option('zen_cortext_quick_links', Zen_Cortext_Defaults::default_quick_links());
+                $preview_link  = !empty($preview_links[0]) ? $preview_links[0] : null;
+                ?>
+                <?php if ($preview_link): ?>
+                <div class="zce-preview-rail">
+                    <span class="zce-preview-rail-label"><?php esc_html_e('Left rail card', 'zen-cortext'); ?></span>
+                    <a class="zcp-rail-btn" href="#" onclick="return false;">
+                        <span class="zcp-rail-btn-icon" aria-hidden="true"><?php echo esc_html($preview_link['icon'] ?? '🌐'); ?></span>
+                        <span class="zcp-rail-btn-label">
+                            <?php if (!empty($preview_link['prefix'])): ?>
+                                <span class="zcp-rail-btn-prefix"><?php echo esc_html($preview_link['prefix']); ?></span>
+                            <?php endif; ?>
+                            <?php echo esc_html($preview_link['label'] ?? ''); ?>
+                        </span>
+                    </a>
+                </div>
+                <?php endif; ?>
+
                 <div class="zc-hero">
                     <h2><?php esc_html_e('Talk to a', 'zen-cortext'); ?> <span class="accent"><?php esc_html_e('technical consultant', 'zen-cortext'); ?></span></h2>
                 </div>

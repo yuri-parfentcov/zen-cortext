@@ -149,7 +149,15 @@ class Zen_Cortext_Shortcode {
             $rules[] = $token . ':' . $value . ';';
         }
         if (!$rules) return '';
-        return '<style id="zen-cortext-color-overrides">.zen-cortext-root{' . implode('', $rules) . '}</style>';
+        // Emit at :root AND .zen-cortext-root so tokens cascade to chrome
+        // that sits OUTSIDE the chat scope — the standalone chat page's
+        // left rail (.zcp-rail), body (.zcp-body), and main wrapper
+        // (.zcp-main) all reference --zc-* tokens but are siblings of
+        // .zen-cortext-root, not children. The .zen-cortext-root rule
+        // stays for backwards-compat with embeds that depend on it.
+        // Vars are namespaced with --zc- so emitting at :root cannot
+        // collide with host-theme styles.
+        return '<style id="zen-cortext-color-overrides">:root,.zen-cortext-root{' . implode('', $rules) . '}</style>';
     }
 
     /**
