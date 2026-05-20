@@ -198,6 +198,36 @@ class Zen_Cortext {
             update_option('zen_cortext_chip_rules_migrated_v2', 'done', false);
         }
 
+        // One-time font-family migration: pre-2.34.5 installs hardcoded
+        // 'Yanone Kaffeesatz' in chat.css. New default is the WP-native
+        // system stack, but existing sites that already render with
+        // Yanone should keep it — sniff the writable chat.css for the
+        // font name and preserve the user's font on upgrade.
+        //
+        // Fresh installs have no writable chat.css yet (it's seeded from
+        // the bundled file on first request) OR it was just seeded with
+        // the new system-stack value; either way the Yanone sniff fails
+        // and the system-stack default sticks.
+        if (get_option('zen_cortext_font_migrated_v2_34_5', '') !== 'done') {
+            $existing = (string) get_option('zen_cortext_font_family', '');
+            if ($existing === '') {
+                $had_yanone = false;
+                if (class_exists('Zen_Cortext_Template_Renderer')) {
+                    $live_css = Zen_Cortext_Template_Renderer::writable_root() . 'assets/chat.css';
+                    if (file_exists($live_css)) {
+                        $contents = @file_get_contents($live_css);
+                        if (is_string($contents) && stripos($contents, 'Yanone Kaffeesatz') !== false) {
+                            $had_yanone = true;
+                        }
+                    }
+                }
+                if ($had_yanone) {
+                    update_option('zen_cortext_font_family', "'Yanone Kaffeesatz', Arial, Helvetica, sans-serif");
+                }
+            }
+            update_option('zen_cortext_font_migrated_v2_34_5', 'done', false);
+        }
+
         // Rewrite rule to serve the livechat service worker from root scope.
         // Without this, the SW file under /wp-content/plugins/ can't control /zen-livechat/.
         add_rewrite_rule('^livechat-sw\.js$', 'index.php?zen_cortext_sw=1', 'top');

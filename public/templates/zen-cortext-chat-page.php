@@ -162,9 +162,26 @@ $buttons_html = ob_get_clean();
 <meta name="robots" content="noindex,follow">
 <title><?php echo esc_html(wp_get_document_title()); ?></title>
 
+<?php
+// Font family — saved per-site (`zen_cortext_font_family`). Fresh installs
+// default to a WP-native system stack (no remote font fetch); existing
+// sites that ran Yanone Kaffeesatz pre-2.34.5 get migrated to the
+// explicit Yanone value via Zen_Cortext::init(), so their look is
+// preserved without a hardcoded brand font in plugin source.
+//
+// The Google Fonts <link> is only emitted when the saved value mentions
+// Yanone — case-insensitive sniff so admins typing 'Yanone Kaffeesatz'
+// in any casing still get the font file. Other custom font stacks (the
+// admin's own brand font, hosted via a font CDN, or system fonts) just
+// don't trigger the Google Fonts preconnect.
+$chat_font_family = (string) get_option('zen_cortext_font_family', Zen_Cortext_Defaults::font_family());
+$load_yanone_font = (stripos($chat_font_family, 'Yanone Kaffeesatz') !== false);
+?>
+<?php if ($load_yanone_font): ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yanone+Kaffeesatz:wght@400;500;600;700&display=swap">
+<?php endif; ?>
 <link rel="stylesheet" href="<?php echo esc_url($chat_css_url); ?>">
 <?php
 // Per-site --zc-* overrides set in the Chat Editor → Colors panel. Echoed
@@ -183,7 +200,7 @@ body.zcp-body {
        fresh installs without saved color overrides still look right. */
     background: var(--zc-bg, #ffffff) !important;
     color: var(--zc-text, #3c434a);
-    font-family: 'Yanone Kaffeesatz', Arial, Helvetica, sans-serif;
+    font-family: <?php echo wp_strip_all_tags($chat_font_family); // CSS context — strip tags only ?>;
     font-size: 18px;
     line-height: 1.2;
     min-height: 100dvh;

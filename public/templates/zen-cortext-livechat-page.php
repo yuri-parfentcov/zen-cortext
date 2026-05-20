@@ -25,9 +25,18 @@ $rest_root        = rest_url('zen-cortext/v1');
 <meta name="theme-color" content="#646B3A">
 <title><?php echo esc_html(wp_get_document_title()); ?></title>
 
+<?php
+// Match the visitor chat — only fetch Yanone when the saved font option
+// names it. Fresh installs get the WP-native stack and skip the Google
+// Fonts preconnect entirely.
+$livechat_font_family = (string) get_option('zen_cortext_font_family', Zen_Cortext_Defaults::font_family());
+$livechat_load_yanone = (stripos($livechat_font_family, 'Yanone Kaffeesatz') !== false);
+?>
+<?php if ($livechat_load_yanone): ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yanone+Kaffeesatz:wght@400;500;600;700&display=swap">
+<?php endif; ?>
 <link rel="stylesheet" href="<?php echo esc_url($livechat_css_url); ?>?ver=<?php echo esc_attr(ZEN_CORTEXT_VERSION); ?>">
 <link rel="manifest" href="<?php echo esc_url(ZEN_CORTEXT_PLUGIN_URL . 'public/assets/manifest.json'); ?>">
 <link rel="apple-touch-icon" href="/biometrics.png">

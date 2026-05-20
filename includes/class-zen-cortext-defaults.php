@@ -78,7 +78,25 @@ class Zen_Cortext_Defaults {
             // option table and the get_option fallback never gets used.
             'zen_cortext_sessions_enabled'              => true,
             'zen_cortext_sessions_gdpr_compliant'       => false,
+            // WP-native font stack on fresh installs — the previous
+            // default was "Yanone Kaffeesatz" (Zen Republic's brand
+            // font), which felt off-brand on any other site. The
+            // migration in Zen_Cortext::init() detects pre-existing
+            // installs by checking the writable chat.css and keeps
+            // their Yanone — only NEW installs get the system stack.
+            'zen_cortext_font_family'                   => self::font_family(),
         );
+    }
+
+    /**
+     * Default chat font family. Matches the WordPress admin font stack
+     * (see /wp-admin/css/forms.css) so a fresh install drops into the
+     * host site looking native to WP. Plain string — admins paste a
+     * full CSS font-family value into the Design tab if they want a
+     * custom font.
+     */
+    public static function font_family() {
+        return "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen-Sans, Ubuntu, Cantarell, \"Helvetica Neue\", sans-serif";
     }
 
     /**
