@@ -66,6 +66,79 @@
             });
         });
 
+        // Hover-highlight: when the admin hovers an element in the live
+        // preview, light up the picker rows on the left that actually
+        // drive that element's colors. Mapping lives here (not in HTML
+        // data-attributes) so the preview markup stays clean and the
+        // map is one canonical source — updating chat.css color rules
+        // means updating this map.
+        //
+        // Selectors are ordered most-specific-first so a `.zc-chip.selected`
+        // match wins over the plain `.zc-chip` rule below it.
+        var HOVER_MAP = [
+            { sel: '.zc-chip.selected, .zc-message-chip.selected',  tokens: ['--zc-primary', '--zc-chip-text'] },
+            { sel: '.zc-chip, .zc-message-chip',                    tokens: ['--zc-accent', '--zc-accent-hover', '--zc-chip-text'] },
+            { sel: '.zc-send',                                      tokens: ['--zc-primary', '--zc-primary-hover'] },
+            { sel: '.zc-input',                                     tokens: ['--zc-surface', '--zc-text', '--zc-border', '--zc-primary'] },
+            { sel: '.zc-share-button, .zc-email-button, .zc-delete-button', tokens: ['--zc-accent', '--zc-accent-hover', '--zc-primary-hover'] },
+            { sel: '.zc-typing-bubble, .zc-typing',                 tokens: ['--zc-assistant-bg'] },
+            { sel: '.zc-message.user .zc-bubble',                   tokens: ['--zc-user-bg', '--zc-user-text'] },
+            { sel: '.zc-message.assistant .zc-bubble',              tokens: ['--zc-assistant-bg', '--zc-text'] },
+            { sel: '.zc-intro-name',                                tokens: ['--zc-text-strong'] },
+            { sel: '.zc-intro-role',                                tokens: ['--zc-text-muted'] },
+            { sel: '.zc-intro-body',                                tokens: ['--zc-text'] },
+            { sel: '.zc-intro-link',                                tokens: ['--zc-accent'] },
+            { sel: '.zc-intro-card',                                tokens: ['--zc-surface', '--zc-border', '--zc-text'] },
+            { sel: '.zc-hero .accent',                              tokens: ['--zc-accent', '--zc-user-text'] },
+            { sel: '.zc-hero h2',                                   tokens: ['--zc-text-strong'] },
+            { sel: '.zc-hero',                                      tokens: ['--zc-text', '--zc-text-strong', '--zc-accent'] },
+        ];
+
+        // Cache row lookups by token for O(1) highlight toggling. Tokens
+        // referenced in HOVER_MAP that aren't in color_tokens() (typos,
+        // future-proofing) silently miss — that's fine, no errors.
+        var rowByToken = {};
+        rows.forEach(function (row) {
+            rowByToken[row.getAttribute('data-token')] = row;
+        });
+
+        function highlightTokens(tokens, on) {
+            tokens.forEach(function (t) {
+                var row = rowByToken[t];
+                if (row) row.classList.toggle('is-zce-highlight', on);
+            });
+        }
+
+        function findMatch(el) {
+            // Walk up from the hovered element to the preview root,
+            // checking each selector in HOVER_MAP order. First match
+            // wins so most-specific rules can shadow generic ones.
+            while (el && el !== miniChat && el.nodeType === 1) {
+                for (var i = 0; i < HOVER_MAP.length; i++) {
+                    if (el.matches(HOVER_MAP[i].sel)) return HOVER_MAP[i];
+                }
+                el = el.parentElement;
+            }
+            return null;
+        }
+
+        var lastMatch = null;
+        if (miniChat) {
+            miniChat.addEventListener('mouseover', function (e) {
+                var m = findMatch(e.target);
+                if (m === lastMatch) return;
+                if (lastMatch) highlightTokens(lastMatch.tokens, false);
+                if (m) highlightTokens(m.tokens, true);
+                lastMatch = m;
+            });
+            miniChat.addEventListener('mouseleave', function () {
+                if (lastMatch) {
+                    highlightTokens(lastMatch.tokens, false);
+                    lastMatch = null;
+                }
+            });
+        }
+
         function saveColors() {
             var payload = {};
             rows.forEach(function (row) {

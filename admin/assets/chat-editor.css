@@ -56,6 +56,17 @@
     border-bottom: 1px solid #f1f1ec;
 }
 .zce-color-row:last-of-type { border-bottom: 0; }
+/* Highlighted row — JS toggles this when the admin hovers a chat element
+   in the live preview that this token drives. Gives a clear visual link
+   between preview ↔ picker without arrows or lines. The transition + the
+   left-edge stripe keep it readable when several rows highlight at once. */
+.zce-color-row.is-zce-highlight {
+    background: #fff8c5;
+    box-shadow: inset 3px 0 0 #f0c33c;
+    border-radius: 4px;
+    transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+.zce-color-row.is-zce-highlight .zce-color-name { font-weight: 600; }
 .zce-color-label { display: flex; flex-direction: column; gap: 2px; line-height: 1.2; }
 .zce-color-name { font-weight: 500; }
 .zce-color-token { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--zce-muted); }
