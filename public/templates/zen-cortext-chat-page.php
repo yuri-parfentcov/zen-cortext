@@ -270,7 +270,7 @@ body.zcp-body {
     gap: 14px;
 }
 .zcp-team-role {
-    font-size: 16px;
+    font-size: 1em;
     color: var(--zc-text-muted, #646970);
     line-height: 1.35;
 }
@@ -291,7 +291,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     object-fit: cover;
 }
 .zcp-team-name {
-    font-size: 16px;
+    font-size: 1em;
     font-weight: 600;
     color: var(--zc-text-strong, #1d2327);
     line-height: 1.2;
@@ -311,7 +311,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     gap: 6px;
     padding: 7px 12px;
     border-radius: 6px;
-    font-size: 16px;
+    font-size: 1em;
     text-decoration: none;
     cursor: pointer;
     line-height: 1;
@@ -335,7 +335,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     color: #fff;
     padding: 3px 8px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 0.6875em;
     white-space: nowrap;
     opacity: 0;
     pointer-events: none;
@@ -372,18 +372,20 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
 }
 .zcp-rail-btn:active { transform: translateX(2px) translateY(1px); }
 .zcp-rail-btn-icon {
-    font-size: 22px;
+    font-size: 1.375em;
     line-height: 1;
     flex-shrink: 0;
 }
 .zcp-rail-btn-label {
-    font-size: 18px;
+    font-size: 1.125em;
     font-weight: 600;
     color: var(--zc-text-strong, #1d2327);
 }
 .zcp-rail-btn-prefix {
     font-weight: 400;
-    font-size: 16px;
+    /* Sized against parent .zcp-rail-btn-label (1.125em), so 0.889em
+       restores the original 16/18 ratio (16px prefix / 18px label). */
+    font-size: 0.889em;
     color: var(--zc-text-muted, #646970);
 }
 
@@ -438,7 +440,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     position: relative;
 }
 .zcp-modal-title {
-    font-size: 20px;
+    font-size: 1.25em;
     font-weight: 600;
     margin: 4px 0 14px;
     color: var(--zc-text-strong, #1d2327);
@@ -454,7 +456,7 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     border: 0;
     background: transparent;
     color: var(--zc-text-muted, #646970);
-    font-size: 26px;
+    font-size: 1.625em;
     line-height: 1;
     cursor: pointer;
     display: flex;
@@ -472,7 +474,8 @@ a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
     .zcp-rail { display: none; }
     .zcp-mobile-trigger { display: flex; }
     .zcp-main { padding: 80px 16px 24px; }
-    body.zcp-body { font-size: 16px; }
+    /* Body font-size override removed in 2.34.10 — picker now drives
+       both desktop and mobile via the inline body rule above. */
 }
 </style>
 </head>
