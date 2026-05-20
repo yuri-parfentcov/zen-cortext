@@ -1,6 +1,14 @@
 <?php
 /**
- * Uninstall Zen Cortext — drop table and delete options.
+ * Uninstall Zen Cortext — full cleanup of plugin state.
+ *
+ * Triggered by WordPress when the admin clicks "Delete" on the
+ * deactivated plugin (or when WP-CLI's `plugin uninstall` runs).
+ *
+ * Design rule: do NOT keep hardcoded lists of options/transients that
+ * fall out of date every time a new feature ships. Sweep by prefix
+ * instead. Tables and writable directories ARE listed explicitly
+ * because dropping the wrong table would be irreversible.
  */
 
 if (!defined('WP_UNINSTALL_PLUGIN')) {
@@ -9,53 +17,67 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
 
 global $wpdb;
 
+/* ------------------------------------------------------------------
+   1. Drop every database table the plugin creates.
+   ------------------------------------------------------------------ */
 $tables = array(
     $wpdb->prefix . 'zen_cortext_kb',
+    $wpdb->prefix . 'zen_cortext_artifacts',
+    $wpdb->prefix . 'zen_cortext_chats',
+    $wpdb->prefix . 'zen_cortext_chat_events',
+    $wpdb->prefix . 'zen_cortext_brainstorm_chats',
+    $wpdb->prefix . 'zen_cortext_sessions',
+    $wpdb->prefix . 'zen_cortext_surveys',
     $wpdb->prefix . 'zen_cortext_attribution_contexts',
     $wpdb->prefix . 'zen_cortext_ads_campaigns',
-    $wpdb->prefix . 'zen_cortext_surveys',
+    $wpdb->prefix . 'zen_cortext_api_keys',
+    $wpdb->prefix . 'zen_cortext_push_subscriptions',
 );
 foreach ($tables as $t) {
+    // Each table name is composed from a constant $wpdb prefix and a
+    // literal suffix — no user input — so the interpolation is safe.
     $wpdb->query("DROP TABLE IF EXISTS {$t}");
 }
 
-$options = array(
-    'zen_cortext_api_key',
-    'zen_cortext_model',
-    'zen_cortext_classify_model',
-    'zen_cortext_max_tokens',
-    'zen_cortext_system_prompt',
-    'zen_cortext_welcome_message',
-    'zen_cortext_intro_card',
-    'zen_cortext_post_types',
-    'zen_cortext_classify_prompt',
-    'zen_cortext_restructure_prompts',
-    'zen_cortext_content_types',
-    'zen_cortext_db_version',
-    'zen_cortext_apps_script_key_hash',
-    'zen_cortext_apps_script_key_last4',
-    'zen_cortext_apps_script_key_rotated_at',
-    'zen_cortext_chat_colors',
-    'zen_cortext_default_survey_id',
-    'zen_cortext_survey_prompt_template',
+/* ------------------------------------------------------------------
+   2. Delete every wp_options row this plugin owns.
+   ------------------------------------------------------------------
+   Wildcard sweep on `zen_cortext_*` so newly-added options (and the
+   migration flags that gate one-time upgrades) get removed without
+   anyone having to remember to update this file. */
+$wpdb->query(
+    "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'zen_cortext\\_%'"
 );
 
-foreach ($options as $opt) {
-    delete_option($opt);
-}
+/* ------------------------------------------------------------------
+   3. Delete every transient under either of the plugin's prefixes.
+   ------------------------------------------------------------------
+   Transients live in wp_options as two rows per entry
+   (`_transient_<key>` + `_transient_timeout_<key>`), or in
+   wp_sitemeta for multisite. The LIKE on option_name catches both.
+   `zen_cortext_*` covers KB cache + brainstorm cache + pending counts.
+   `zce_*` covers chat editor preview drafts (per-user). */
+$wpdb->query(
+    "DELETE FROM {$wpdb->options}
+     WHERE option_name LIKE '\\_transient\\_zen\\_cortext\\_%'
+        OR option_name LIKE '\\_transient\\_timeout\\_zen\\_cortext\\_%'
+        OR option_name LIKE '\\_transient\\_zce\\_%'
+        OR option_name LIKE '\\_transient\\_timeout\\_zce\\_%'"
+);
 
-// Plugin classes are not loaded during uninstall — flush KB transients
-// directly rather than going through Zen_Cortext_KB::flush_cache().
-delete_transient('zen_cortext_kb_cache');
-delete_transient('zen_cortext_kb_brainstorm_cache');
-delete_transient('zen_cortext_kb_pending');
+/* ------------------------------------------------------------------
+   4. Delete user_meta keys (takeover status / last_seen / schedule).
+   ------------------------------------------------------------------ */
+$wpdb->query(
+    "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE 'zen_cortext\\_%'"
+);
 
-// Sweep all per-user chat-editor preview drafts. Transients live as two
-// rows per entry in wp_options (`_transient_<key>` and
-// `_transient_timeout_<key>`); the LIKE on the option_name catches both.
-$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_zce\\_preview\\_%' OR option_name LIKE '\\_transient\\_timeout\\_zce\\_preview\\_%'");
-
-// Drop the writable artifacts directory (live + version snapshots).
+/* ------------------------------------------------------------------
+   5. Drop the writable artifacts directory.
+   ------------------------------------------------------------------
+   Includes the writable copies of chat.css / templates / version
+   snapshots created by the chat editor. wp_upload_dir() respects
+   any host-specific overrides (e.g. multisite layout, S3 plugins). */
 $uploads = wp_upload_dir();
 $zce_dir = trailingslashit($uploads['basedir']) . 'zen-cortext';
 if (is_dir($zce_dir)) {
@@ -70,4 +92,24 @@ if (is_dir($zce_dir)) {
         @rmdir($path);
     };
     $rrm($zce_dir);
+}
+
+/* ------------------------------------------------------------------
+   6. Multisite: repeat options/transients/usermeta sweep on every blog.
+   ------------------------------------------------------------------ */
+if (is_multisite()) {
+    $blog_ids = $wpdb->get_col("SELECT blog_id FROM {$wpdb->blogs}");
+    foreach ($blog_ids as $blog_id) {
+        switch_to_blog((int) $blog_id);
+        $opts = $wpdb->prefix . 'options';
+        $wpdb->query("DELETE FROM {$opts} WHERE option_name LIKE 'zen_cortext\\_%'");
+        $wpdb->query(
+            "DELETE FROM {$opts}
+             WHERE option_name LIKE '\\_transient\\_zen\\_cortext\\_%'
+                OR option_name LIKE '\\_transient\\_timeout\\_zen\\_cortext\\_%'
+                OR option_name LIKE '\\_transient\\_zce\\_%'
+                OR option_name LIKE '\\_transient\\_timeout\\_zce\\_%'"
+        );
+        restore_current_blog();
+    }
 }

@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ZEN_CORTEXT_VERSION', '2.34.5');
+define('ZEN_CORTEXT_VERSION', '2.34.6');
 define('ZEN_CORTEXT_PLUGIN_FILE', __FILE__);
 define('ZEN_CORTEXT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ZEN_CORTEXT_PLUGIN_URL', plugin_dir_url(__FILE__));
