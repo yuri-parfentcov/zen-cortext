@@ -75,9 +75,7 @@ class Zen_Cortext_Shortcode {
         // an edited copy, factory URL inside the plugin tree otherwise.
         // The mtime cache-buster baked into asset_url() means saves
         // invalidate the browser cache without bumping plugin version.
-        $chat_css_url = class_exists('Zen_Cortext_Template_Renderer')
-            ? Zen_Cortext_Template_Renderer::asset_url('chat.css')
-            : ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.css';
+        $chat_css_url = Zen_Cortext_Template_Renderer::asset_url('chat.css');
         wp_register_style(
             'zen-cortext-public',
             $chat_css_url,

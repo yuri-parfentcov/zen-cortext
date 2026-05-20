@@ -144,59 +144,14 @@ class Zen_Cortext {
             Zen_Cortext_Template_Renderer::ensure_seeded();
         }
 
-        // One-time migration: rename the legacy palette-flavoured token
-        // names (--zc-lime / --zc-olive / -dark) to the new neutral
-        // semantic names (--zc-accent / --zc-primary / -hover) inside
-        // the saved color overrides option, so admins who customized
-        // colors before the rename keep their picks.
-        $migrated = (string) get_option('zen_cortext_chat_colors_migrated_v2_19_9', '');
-        if ($migrated !== 'done') {
-            $colors = (array) get_option('zen_cortext_chat_colors', array());
-            $renames = array(
-                '--zc-lime'       => '--zc-accent',
-                '--zc-lime-dark'  => '--zc-accent-hover',
-                '--zc-olive'      => '--zc-primary',
-                '--zc-olive-dark' => '--zc-primary-hover',
-            );
-            $changed = false;
-            foreach ($renames as $old => $new) {
-                if (isset($colors[$old]) && !isset($colors[$new])) {
-                    $colors[$new] = $colors[$old];
-                    unset($colors[$old]);
-                    $changed = true;
-                }
-            }
-            if ($changed) update_option('zen_cortext_chat_colors', $colors);
-            update_option('zen_cortext_chat_colors_migrated_v2_19_9', 'done', false);
-        }
-
-        // One-time migration: strip any inline chip-rules section from a
-        // customized saved system prompt. Chip-usage rules now live in
-        // Zen_Cortext_Defaults::chip_rules_block() and are appended LAST
-        // to the prompt at runtime (see class-zen-cortext-api.php).
-        //
-        // We don't match on heading text ("## Follow-up chips") because
-        // admins on long-lived installs have renamed it ("## Follow-up
-        // options") and rewritten the example chips to be site-specific.
-        // Instead we walk every "## " section and strip any whose body
-        // contains a literal "[chip]" marker — that's the unambiguous
-        // signal it's the chip-rules section regardless of wording.
-        if (get_option('zen_cortext_chip_rules_migrated_v2', '') !== 'done') {
-            $saved = (string) get_option('zen_cortext_system_prompt', '');
-            if ($saved !== '' && strpos($saved, '[chip]') !== false) {
-                $cleaned = preg_replace_callback(
-                    '/\n+## [^\n]+\n.*?(?=\n## |\z)/s',
-                    function ($m) {
-                        return (strpos($m[0], '[chip]') !== false) ? '' : $m[0];
-                    },
-                    $saved
-                );
-                if (is_string($cleaned) && $cleaned !== $saved) {
-                    update_option('zen_cortext_system_prompt', $cleaned);
-                }
-            }
-            update_option('zen_cortext_chip_rules_migrated_v2', 'done', false);
-        }
+        // Old one-time migrations removed in 2.34.7:
+        //   - zen_cortext_chat_colors_migrated_v2_19_9 (renamed legacy
+        //     --zc-lime / --zc-olive tokens to --zc-accent / --zc-primary)
+        //   - zen_cortext_chip_rules_migrated_v2 (stripped inline chip-rules
+        //     section from customized system prompts)
+        // Both have shipped for many minor versions; the new uninstall.php
+        // wildcard-sweeps the leftover `*_migrated_*` option keys so the
+        // gating flags don't accumulate.
 
         // One-time font-family migration: pre-2.34.5 installs hardcoded
         // 'Yanone Kaffeesatz' in chat.css. New default is the WP-native

@@ -4,22 +4,31 @@
 }
 
 .zen-cortext-root {
-    --zc-accent: #DBEB7E;
-    --zc-accent-hover: #c5d66a;
-    --zc-primary: #646B3A;
-    --zc-primary-hover: #4a4f2b;
+    /* WordPress admin styling defaults.
+       Matches the color palette in /wp-admin/css/colors/_admin.scss so a
+       fresh install drops into the host site looking native to WP. */
+    --zc-accent: #2271b1;
+    --zc-accent-hover: #135e96;
+    --zc-primary: #2271b1;
+    --zc-primary-hover: #135e96;
     --zc-bg: #ffffff;
     --zc-surface: #ffffff;
-    --zc-text: #333333;
-    --zc-text-strong: #000000;
-    --zc-text-muted: #6b7280;
-    --zc-border: #e5e5e5;
+    --zc-text: #3c434a;
+    --zc-text-strong: #1d2327;
+    --zc-text-muted: #646970;
+    --zc-border: #c3c4c7;
     --zc-user-bg: var(--zc-primary);
     --zc-user-text: #ffffff;
-    --zc-assistant-bg: #f6f7ee;
+    --zc-assistant-bg: #f0f0f1;
+    --zc-chip-text: #ffffff;
     --zc-radius: 8px;
 
-    font-family: 'Yanone Kaffeesatz', Arial, Helvetica, sans-serif;
+    /* WP-native font stack — matches /wp-admin/css/forms.css so a fresh
+       install drops into the host site looking native to WP. Existing
+       sites that ran 'Yanone Kaffeesatz' pre-2.34.5 keep it via the
+       writable chat.css copy in uploads/, which the renderer prefers
+       when present. */
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     font-size: 18px;
     line-height: 1.2;
     color: var(--zc-text);
@@ -520,7 +529,7 @@
 }
 
 .zen-cortext-root .zc-chips {
-    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px;
+    display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 22px;
 }
 .zen-cortext-root .zc-chip,
 .zen-cortext-root .zc-message-chip {
@@ -531,7 +540,7 @@
     font-size: 16px;
     font-weight: 500;
     cursor: pointer;
-    color: var(--zc-primary-hover);
+    color: var(--zc-chip-text, #fff);
     font-family: inherit;
     transition: background 0.15s, transform 0.1s, border-color 0.15s;
     text-align: left;

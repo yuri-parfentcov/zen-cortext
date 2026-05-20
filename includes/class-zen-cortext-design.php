@@ -111,9 +111,7 @@ class Zen_Cortext_Design {
         // The .zce-mini-chat overrides in chat-editor.css constrain the
         // size so we still get a compact preview, not the full 760px
         // chat layout.
-        $chat_css_url = class_exists('Zen_Cortext_Template_Renderer')
-            ? Zen_Cortext_Template_Renderer::asset_url('chat.css')
-            : ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.css?ver=' . ZEN_CORTEXT_VERSION;
+        $chat_css_url = Zen_Cortext_Template_Renderer::asset_url('chat.css');
         wp_enqueue_style(
             'zen-cortext-chat-public',
             $chat_css_url,

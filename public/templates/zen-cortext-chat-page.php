@@ -37,9 +37,7 @@ $default_chips  = array_values((array) get_option('zen_cortext_default_chips', a
 // chat.css is admin-editable from the Template Editor. asset_url()
 // returns the uploaded "live" URL when it exists, factory URL otherwise,
 // with an mtime cache-buster baked in.
-$chat_css_url          = class_exists('Zen_Cortext_Template_Renderer')
-    ? Zen_Cortext_Template_Renderer::asset_url('chat.css')
-    : ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.css';
+$chat_css_url          = Zen_Cortext_Template_Renderer::asset_url('chat.css');
 $chat_js_url           = ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.js';
 $rest_url              = rest_url('zen-cortext/v1/send');
 $rest_root             = rest_url('zen-cortext/v1');
