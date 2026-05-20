@@ -114,16 +114,17 @@ class Zen_Cortext_Defaults {
 
     /**
      * Default chat base font size — empty string. Empty means inherit
-     * from host theme. Standalone /talk/ falls back to 16px (was 18px
-     * pre-2.34.7; user feedback was "too large").
+     * from host theme. Standalone /talk/ falls back to
+     * font_size_standalone_fallback() (14px since 2.34.12).
      */
     public static function font_size() {
         return '';
     }
 
-    /** Standalone /talk/ fallback for base font size (px). */
+    /** Standalone /talk/ fallback for base font size (px).
+     *  History: 18 (pre-2.34.7) → 16 (2.34.7) → 14 (2.34.12). */
     public static function font_size_standalone_fallback() {
-        return 16;
+        return 14;
     }
 
     /**
