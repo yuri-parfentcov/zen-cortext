@@ -113,6 +113,22 @@ class Zen_Cortext_Admin {
             58
         );
 
+        // Getting Started — first sub-item. Registered with explicit
+        // position 0 so it slots above the Settings auto-rename below.
+        // The slug `zen-cortext-init` keeps it separate from the parent
+        // slug, so `?page=zen-cortext` keeps routing to Settings and
+        // every existing deep link (?page=zen-cortext&tab=connection,
+        // &tab=design, etc.) keeps working unchanged.
+        $this->init_hook = add_submenu_page(
+            'zen-cortext',
+            __('Getting Started with Zen Cortext', 'zen-cortext'),
+            __('Getting Started', 'zen-cortext'),
+            'manage_options',
+            'zen-cortext-init',
+            array($this, 'render_initialization_page'),
+            0
+        );
+
         // Rename the auto-generated first submenu entry from "Zen Cortext" to "Settings".
         add_submenu_page(
             'zen-cortext',
@@ -687,6 +703,14 @@ class Zen_Cortext_Admin {
     }
 
     public function enqueue($hook) {
+        // Getting Started — onboarding guide. Pure HTML with inline
+        // styles; just needs the shared admin.css for WP-styled buttons
+        // and matching neutral palette. No JS (uses native <details>).
+        if (!empty($this->init_hook) && $hook === $this->init_hook) {
+            wp_enqueue_style('zen-cortext-admin', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/admin.css', array(), ZEN_CORTEXT_VERSION);
+            return;
+        }
+
         // Brainstorm page has its own dedicated bundle — no jQuery dependency,
         // no shared state with the legacy admin pages.
         if (!empty($this->brainstorm_hook) && $hook === $this->brainstorm_hook) {
@@ -874,6 +898,26 @@ class Zen_Cortext_Admin {
         $tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'connection';
         if (!in_array($tab, $allowed, true)) $tab = 'connection';
         include ZEN_CORTEXT_PLUGIN_DIR . 'admin/views/settings-page.php';
+    }
+
+    /**
+     * Getting Started — onboarding guide rendered as collapsible
+     * `<details>` cards, one per setup step. Pending steps start
+     * expanded with a ⚠ marker; completed steps collapse to a one-line
+     * ✓ summary so a returning admin sees their progress at a glance.
+     *
+     * The view ../admin/views/_getting-started.php pulls all of its
+     * "is step done?" signals from Zen_Cortext_Setup_State::summary()
+     * so the queries live in one place.
+     */
+    public function render_initialization_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+        }
+        if (!class_exists('Zen_Cortext_Setup_State')) {
+            require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-setup-state.php';
+        }
+        include ZEN_CORTEXT_PLUGIN_DIR . 'admin/views/_getting-started.php';
     }
 
     public function render_kb_page() {

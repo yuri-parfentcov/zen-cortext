@@ -46,6 +46,7 @@ class Zen_Cortext {
         require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-extractor.php';
         require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-api.php';
         require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-admin.php';
+        require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-setup-state.php';
         require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-template-renderer.php';
         require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-shortcode.php';
         require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-rest.php';
@@ -58,6 +59,7 @@ class Zen_Cortext {
 
     private function init_hooks() {
         add_action('init', array($this, 'init'));
+        add_action('admin_init', array($this, 'maybe_first_run_redirect'));
         Zen_Cortext_Admin::get_instance();
         Zen_Cortext_Shortcode::get_instance();
         Zen_Cortext_Rest::get_instance();
@@ -236,6 +238,31 @@ class Zen_Cortext {
         }
 
         update_option('zen_cortext_db_version', ZEN_CORTEXT_DB_VERSION);
+
+        // First-run flag — picked up by maybe_first_run_redirect() on
+        // the next wp-admin page load. Short TTL so the transient self-
+        // expires if the admin never visits the dashboard; we don't want
+        // a stale activation to surprise-redirect three days later.
+        set_transient('zen_cortext_first_run_redirect', 1, 60);
+    }
+
+    /**
+     * One-shot redirect to the Getting Started page after activation.
+     * Fires on admin_init; consumes the transient so it only ever runs
+     * once. Bails on AJAX / cron / network-admin / non-admin contexts
+     * so we never redirect mid-request.
+     */
+    public function maybe_first_run_redirect() {
+        if (!get_transient('zen_cortext_first_run_redirect')) return;
+        if (wp_doing_ajax() || wp_doing_cron())               return;
+        if (is_network_admin())                               return;
+        if (!current_user_can('manage_options'))              return;
+        // Don't bounce out of the install screen or the plugins page mid-bulk-action.
+        if (isset($_GET['activate-multi']) || isset($_GET['action'])) return;
+
+        delete_transient('zen_cortext_first_run_redirect');
+        wp_safe_redirect(admin_url('admin.php?page=zen-cortext-init'));
+        exit;
     }
 
     public static function deactivate() {
