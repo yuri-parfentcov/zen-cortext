@@ -227,7 +227,45 @@ $test_chat_url = Zen_Cortext_Setup_State::first_chat_page_url();
             </p>
         <?php }); ?>
 
-        <?php $render_step('surveys', 9, __('Surveys / interview scripts (optional)', 'zen-cortext'), true, function () use ($init_url) { ?>
+        <?php $render_step('voice', 9, __('Voice input — speech-to-text key', 'zen-cortext'), true, function () use ($init_url) { ?>
+            <p>
+                <?php esc_html_e('Let visitors record voice messages instead of typing. The plugin uses Groq Whisper as the primary transcription provider (fast + free tier) with OpenAI Whisper as a fallback — bring your own key for whichever service you prefer. Either key alone is enough; you don\'t need both.', 'zen-cortext'); ?>
+            </p>
+            <p>
+                <strong><?php esc_html_e('Where to get a key:', 'zen-cortext'); ?></strong>
+            </p>
+            <ul>
+                <li><?php
+                    /* translators: 1, 2 = links */
+                    printf(
+                        wp_kses(
+                            __('Groq (recommended): create a key at %1$s. Free tier covers thousands of minutes of audio.', 'zen-cortext'),
+                            array('a' => array('href' => array(), 'target' => array(), 'rel' => array()))
+                        ),
+                        '<a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys ↗</a>'
+                    );
+                ?></li>
+                <li><?php
+                    printf(
+                        wp_kses(
+                            __('OpenAI (fallback): create a key at %1$s. Paid per-minute pricing but very robust.', 'zen-cortext'),
+                            array('a' => array('href' => array(), 'target' => array(), 'rel' => array()))
+                        ),
+                        '<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys ↗</a>'
+                    );
+                ?></li>
+            </ul>
+            <p>
+                <?php esc_html_e('On the Voice tab, flip "Enable voice input", paste a key, and a microphone button will appear next to the chat input on mobile (where typing is most painful).', 'zen-cortext'); ?>
+            </p>
+            <p class="zci-actions">
+                <a href="<?php echo esc_url($init_url('zen-cortext', 'voice')); ?>" class="button button-primary">
+                    <?php esc_html_e('Open Voice settings', 'zen-cortext'); ?>
+                </a>
+            </p>
+        <?php }); ?>
+
+        <?php $render_step('surveys', 10, __('Surveys / interview scripts (optional)', 'zen-cortext'), true, function () use ($init_url) { ?>
             <p>
                 <?php esc_html_e('Write a short interview the AI weaves into the conversation to learn about the visitor (their goals, current setup, decision criteria). The script is treated as guidance, not a recital — the AI keeps natural rapport.', 'zen-cortext'); ?>
             </p>
@@ -241,7 +279,7 @@ $test_chat_url = Zen_Cortext_Setup_State::first_chat_page_url();
             </p>
         <?php }); ?>
 
-        <?php $render_step('attribution', 10, __('Attribution context rules (optional, advanced)', 'zen-cortext'), true, function () use ($init_url) { ?>
+        <?php $render_step('attribution', 11, __('Attribution context rules (optional, advanced)', 'zen-cortext'), true, function () use ($init_url) { ?>
             <p>
                 <?php esc_html_e('Override the AI\'s framing for visitors arriving from a specific ad / UTM / referrer. Each rule defines: a match condition (campaign name, UTM source, referer regex…) and a context block that gets prepended to the system prompt for those visitors only.', 'zen-cortext'); ?>
             </p>
@@ -255,7 +293,7 @@ $test_chat_url = Zen_Cortext_Setup_State::first_chat_page_url();
             </p>
         <?php }); ?>
 
-        <?php $render_step('test_chat', 11, __('Test the chat', 'zen-cortext'), false, function () use ($test_chat_url) { ?>
+        <?php $render_step('test_chat', 12, __('Test the chat', 'zen-cortext'), false, function () use ($test_chat_url) { ?>
             <p>
                 <?php esc_html_e('Open your chat page in a regular browser tab (not the admin) and ask a question that\'s clearly in scope for your site. Verify: the welcome message looks right, the answer is grounded in your KB, the suggested chips make sense, and any team-member invite buttons appear correctly.', 'zen-cortext'); ?>
             </p>

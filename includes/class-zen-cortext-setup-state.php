@@ -91,6 +91,19 @@ class Zen_Cortext_Setup_State {
         return (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}zen_cortext_attribution_contexts") > 0;
     }
 
+    /**
+     * Voice input is "configured" when the master toggle is ON AND at
+     * least one transcription key is saved (Groq Whisper primary, OpenAI
+     * Whisper fallback). Either key alone is enough to make the feature
+     * work — the runtime falls back to whichever is set.
+     */
+    public static function voice_configured() {
+        if (!get_option('zen_cortext_voice_enabled', false)) return false;
+        $groq   = trim((string) get_option('zen_cortext_groq_api_key', ''));
+        $openai = trim((string) get_option('zen_cortext_openai_api_key', ''));
+        return ($groq !== '' || $openai !== '');
+    }
+
     /** Any chat conversation has been started (testing signal). */
     public static function chats_started() {
         global $wpdb;
@@ -164,6 +177,11 @@ class Zen_Cortext_Setup_State {
                 'key'      => 'float_button',
                 'required' => false,
                 'done'     => self::float_button_enabled(),
+            ),
+            array(
+                'key'      => 'voice',
+                'required' => false,
+                'done'     => self::voice_configured(),
             ),
             array(
                 'key'      => 'surveys',
