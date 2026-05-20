@@ -186,7 +186,7 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: #f6f7ee;
+    background: var(--zc-assistant-bg);
     border: 1px solid var(--zc-accent-hover);
     color: var(--zc-primary-hover);
     border-radius: 9999px;
@@ -214,8 +214,8 @@
     align-items: center;
     gap: 6px;
     background: transparent;
-    border: 1px solid #e5e5e5;
-    color: #6b7280;
+    border: 1px solid var(--zc-border);
+    color: var(--zc-text-muted);
     border-radius: 9999px;
     padding: 7px 12px;
     font-family: inherit;
@@ -254,7 +254,7 @@
     transition: background .15s, border-color .15s, color .15s, transform .1s;
 }
 .zen-cortext-root .zc-email-button:hover {
-    background: #f6f7ee;
+    background: var(--zc-assistant-bg);
     border-color: var(--zc-primary);
 }
 .zen-cortext-root .zc-email-button:active { transform: translateY(1px); }
@@ -332,7 +332,7 @@
     flex-wrap: wrap;
     margin-bottom: 12px;
     padding: 10px 14px;
-    background: #f6f7ee;
+    background: var(--zc-assistant-bg);
     border: 1px solid var(--zc-accent-hover);
     border-radius: var(--zc-radius);
 }
@@ -443,7 +443,7 @@
 }
 .zen-cortext-root .zc-input {
     flex: 1;
-    border: 1px solid #ccc;
+    border: 1px solid var(--zc-border);
     border-radius: var(--zc-radius);
     padding: 14px 18px;
     font-size: var(--zc-font-size, 1em);
@@ -452,7 +452,7 @@
     outline: none;
     max-height: 140px;
     line-height: 1.3;
-    background: #ffffff;
+    background: var(--zc-surface);
     color: var(--zc-text);
     transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -487,9 +487,9 @@
     height: 48px;
     flex: 0 0 48px;
     align-self: flex-end;
-    border: 1px solid #ccc;
+    border: 1px solid var(--zc-border);
     border-radius: 50%;
-    background: #ffffff;
+    background: var(--zc-surface);
     color: var(--zc-primary);
     cursor: pointer;
     padding: 0;
@@ -612,7 +612,7 @@
 .zen-cortext-root .zc-survey-submit:active { transform: translateY(1px); }
 
 .zen-cortext-root .zc-intro-card {
-    background: #ffffff;
+    background: var(--zc-surface);
     border: 1px solid var(--zc-border);
     border-left: 4px solid var(--zc-accent);
     border-radius: var(--zc-radius);
@@ -692,13 +692,13 @@
    ----------------------------------------------------------------- */
 .zen-cortext-root .zc-bubble.zc-lead-form {
     padding: 16px 18px;
-    background: #f8fbe9;
-    border: 1px solid #dbe6a0;
+    background: var(--zc-assistant-bg);
+    border: 1px solid var(--zc-border);
 }
 .zen-cortext-root .zc-lead-intro {
     margin: 0 0 12px 0;
     font-size: 0.9375em;
-    color: #3a3f20;
+    color: var(--zc-text);
 }
 .zen-cortext-root .zc-lead-form-inner {
     display: flex;
@@ -707,17 +707,17 @@
 }
 .zen-cortext-root .zc-lead-input {
     padding: 10px 12px;
-    border: 1px solid #c8d177;
+    border: 1px solid var(--zc-border);
     border-radius: 8px;
     font-family: inherit;
     font-size: 0.9375em;
-    background: #fff;
-    color: #222;
+    background: var(--zc-surface);
+    color: var(--zc-text);
 }
 .zen-cortext-root .zc-lead-input:focus {
-    outline: 2px solid var(--zc-primary, #646B3A);
+    outline: 2px solid var(--zc-primary);
     outline-offset: -1px;
-    border-color: var(--zc-primary, #646B3A);
+    border-color: var(--zc-primary);
 }
 .zen-cortext-root .zc-lead-buttons {
     display: flex;
@@ -735,19 +735,22 @@
     font-size: 0.9375em;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color .15s, color .15s;
+    transition: background-color .15s, color .15s, border-color .15s;
 }
 .zen-cortext-root .zc-lead-submit {
-    background: var(--zc-primary, #646B3A);
+    background: var(--zc-primary);
     color: #fff;
 }
-.zen-cortext-root .zc-lead-submit:hover:not(:disabled) { background: #4d5230; }
+.zen-cortext-root .zc-lead-submit:hover:not(:disabled) { background: var(--zc-primary-hover); }
 .zen-cortext-root .zc-lead-invite {
-    background: #fff;
-    color: #3a3f20;
-    border: 1px solid #c8d177;
+    background: var(--zc-surface);
+    color: var(--zc-text-strong);
+    border: 1px solid var(--zc-border);
 }
-.zen-cortext-root .zc-lead-invite:hover:not(:disabled) { background: #eef4cf; }
+.zen-cortext-root .zc-lead-invite:hover:not(:disabled) {
+    background: var(--zc-assistant-bg);
+    border-color: var(--zc-accent);
+}
 .zen-cortext-root .zc-lead-submit:disabled,
 .zen-cortext-root .zc-lead-invite:disabled {
     opacity: .55;
@@ -755,11 +758,11 @@
 }
 .zen-cortext-root .zc-lead-status {
     font-size: 0.8125em;
-    color: #6d7a3a;
+    color: var(--zc-text-muted);
     margin-top: 4px;
     min-height: 1em;
 }
 .zen-cortext-root .zc-bubble.zc-lead-done {
-    background: #eef4cf;
-    border-color: #c8d177;
+    background: var(--zc-assistant-bg);
+    border-color: var(--zc-border);
 }
