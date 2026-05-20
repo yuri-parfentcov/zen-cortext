@@ -139,7 +139,8 @@ class Zen_Cortext_Shortcode {
      * defaults stand alone.
      */
     public static function build_color_override_style() {
-        $rules = array();
+        $token_rules = array();
+        $direct_rules = '';
 
         // Color tokens — one --zc-* rule per saved palette pick.
         $colors = (array) get_option('zen_cortext_chat_colors', array());
@@ -147,32 +148,49 @@ class Zen_Cortext_Shortcode {
             $token = self::sanitize_token_name($token);
             $value = self::sanitize_token_value($value);
             if ($token === '' || $value === '') continue;
-            $rules[] = $token . ':' . $value . ';';
+            $token_rules[] = $token . ':' . $value . ';';
         }
 
-        // Typography — emit --zc-font-family / --zc-font-size only when
-        // the admin has picked something. Empty option = inherit from
-        // host theme; the chat.css default rules (var(--zc-font-*, inherit))
-        // do the right thing on their own.
+        // Typography — emit BOTH the CSS variable AND direct font-* rules
+        // on the elements that need to follow the picker. The variable
+        // is the modern path (new factory chat.css uses var() refs); the
+        // direct rules cover sites with a stale writable chat.css that
+        // still has hardcoded sizes from pre-2.34.7. Direct rules sit in
+        // an inline <style> printed AFTER the chat.css <link>, so they
+        // win on identical specificity without needing !important.
         $font_family = trim((string) get_option('zen_cortext_font_family', ''));
         if ($font_family !== '') {
-            $rules[] = '--zc-font-family:' . self::sanitize_font_family($font_family) . ';';
+            $ff = self::sanitize_font_family($font_family);
+            $token_rules[] = '--zc-font-family:' . $ff . ';';
+            $direct_rules .= '.zen-cortext-root{font-family:' . $ff . ';}';
         }
         $font_size = (int) get_option('zen_cortext_font_size', 0);
         if ($font_size > 0 && $font_size <= 64) {
-            $rules[] = '--zc-font-size:' . $font_size . 'px;';
+            $token_rules[] = '--zc-font-size:' . $font_size . 'px;';
+            // Hit every element that's set to a literal font-size in the
+            // pre-2.34.7 chat.css. Without these, sites that haven't
+            // re-seeded their writable chat.css see no change when they
+            // move the picker.
+            $direct_rules .= '.zen-cortext-root,'
+                          . '.zen-cortext-root .zc-bubble,'
+                          . '.zen-cortext-root .zc-input,'
+                          . '.zen-cortext-root .zc-send,'
+                          . '.zen-cortext-root .zc-bubble code'
+                          . '{font-size:' . $font_size . 'px;}';
         }
 
-        if (!$rules) return '';
-        // Emit at :root AND .zen-cortext-root so tokens cascade to chrome
-        // that sits OUTSIDE the chat scope — the standalone chat page's
-        // left rail (.zcp-rail), body (.zcp-body), and main wrapper
-        // (.zcp-main) all reference --zc-* tokens but are siblings of
-        // .zen-cortext-root, not children. The .zen-cortext-root rule
-        // stays for backwards-compat with embeds that depend on it.
-        // Vars are namespaced with --zc- so emitting at :root cannot
-        // collide with host-theme styles.
-        return '<style id="zen-cortext-color-overrides">:root,.zen-cortext-root{' . implode('', $rules) . '}</style>';
+        if (!$token_rules && $direct_rules === '') return '';
+        // Token rules go on `:root, .zen-cortext-root` so colors cascade
+        // to chrome outside the chat scope (left rail, body, main wrapper).
+        // Direct typography rules use the more specific .zen-cortext-root
+        // selectors so they override chat.css at the same or higher
+        // specificity. Vars are --zc-prefixed; safe to emit at :root.
+        $css = '';
+        if ($token_rules) {
+            $css .= ':root,.zen-cortext-root{' . implode('', $token_rules) . '}';
+        }
+        $css .= $direct_rules;
+        return '<style id="zen-cortext-color-overrides">' . $css . '</style>';
     }
 
     /**
