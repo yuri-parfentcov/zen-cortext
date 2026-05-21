@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Knowledge Artifacts tab body.
  *
@@ -21,6 +22,7 @@ $artifact_types = Zen_Cortext_KB_Types::labels();
         <?php
         printf(
             wp_kses(
+                /* translators: %s is the HTML link to the Knowledge Base tab where content types are defined. */
                 __('No content types are defined yet. Open the %s tab and add at least one before creating artifacts.', 'zen-cortext'),
                 array('a' => array('href' => array()))
             ),

@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Attribution Context admin page.
  * CRUD list + editor for rules that customize the visitor chat based on
@@ -65,6 +66,7 @@ if (!defined('ABSPATH')) exit;
                         <?php esc_html_e('Comma-separated. Matches if the visitor\'s utm_source equals ANY entry. Case-insensitive.', 'zen-cortext'); ?>
                         <?php
                         printf(
+                            /* translators: %s is a <code>-wrapped example value(s) the admin can paste into the field. */
                             ' ' . wp_kses(__('Example: %s.', 'zen-cortext'), array('code' => array())),
                             '<code>google, bing</code>'
                         );
@@ -79,6 +81,7 @@ if (!defined('ABSPATH')) exit;
                         <?php esc_html_e('Comma-separated. Matches if the visitor\'s utm_medium equals ANY entry.', 'zen-cortext'); ?>
                         <?php
                         printf(
+                            /* translators: %s is a <code>-wrapped example value(s) the admin can paste into the field. */
                             ' ' . wp_kses(__('Example: %s.', 'zen-cortext'), array('code' => array())),
                             '<code>cpc, ppc</code>'
                         );
@@ -99,6 +102,7 @@ if (!defined('ABSPATH')) exit;
                         <?php esc_html_e('Comma-separated. Each entry can be a campaign name OR the numeric campaign ID. If any entry matches a synced row (by either field), live Google Ads metadata is appended to the AI prompt.', 'zen-cortext'); ?>
                         <?php
                         printf(
+                            /* translators: %s is a <code>-wrapped example value(s) the admin can paste into the field. */
                             ' ' . wp_kses(__('Example: %s.', 'zen-cortext'), array('code' => array())),
                             '<code>foreman-pro-q2, foreman-pro-q3</code>'
                         );
@@ -115,6 +119,7 @@ if (!defined('ABSPATH')) exit;
                         <?php
                         printf(
                             wp_kses(
+                                /* translators: %1$s is a sample bare host, %2$s is the literal "www.", %3$s is a path-fragment example, %4$s is a host-plus-path example — all in <code> tags. */
                                 __('%1$s — bare host (matches the referrer\'s host exactly, %2$s stripped automatically); %3$s — path fragment (matches anywhere in the referrer URL); %4$s — host + path fragment (good for internal-traffic rules).', 'zen-cortext'),
                                 array('code' => array())
                             ),
@@ -127,6 +132,7 @@ if (!defined('ABSPATH')) exit;
                         <br>
                         <?php
                         printf(
+                            /* translators: %s is a <code>-wrapped example value(s) the admin can paste into the field. */
                             wp_kses(__('Example: %s.', 'zen-cortext'), array('code' => array())),
                             '<code>facebook.com, /blog, zenrepublic.agency/services</code>'
                         );
@@ -166,6 +172,7 @@ if (!defined('ABSPATH')) exit;
                         <?php
                         printf(
                             wp_kses(
+                                /* translators: %1$s is an opening <a> tag pointing to the Surveys admin page, %2$s is the closing </a>. */
                                 __('Optional. The AI weaves the chosen survey\'s questions into the chat when this rule matches. Manage scripts on %1$sZen Cortext → Surveys%2$s.', 'zen-cortext'),
                                 array('a' => array('href' => array()))
                             ),
@@ -197,8 +204,8 @@ if (!defined('ABSPATH')) exit;
                         <?php esc_html_e('Replaces the default starter chips when this rule matches. One chip per line. Chat picks 4 at random per visit. Empty = no chips shown.', 'zen-cortext'); ?>
                         <br>
                         <?php
-                        /* translators: 1, 2, 3 are example chip lines wrapped in <code> */
                         printf(
+                            /* translators: %1$s is the full chip format example (emoji | label | message), %2$s and %3$s are the optional individual fields ("emoji" and "message"), each wrapped in <code>. */
                             esc_html__('Format per line: %1$s — %2$s and %3$s are optional.', 'zen-cortext'),
                             '<code>emoji | label | message</code>',
                             '<code>emoji</code>',

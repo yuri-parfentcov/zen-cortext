@@ -7,6 +7,22 @@
  * - stream_chat(): streams SSE chunks straight to PHP output (used by REST controller)
  */
 
+/*
+ * phpcs:disable Generic.PHP.ForbiddenFunctions.Found
+ * phpcs:disable WordPress.WP.AlternativeFunctions.curl_curl_init,WordPress.WP.AlternativeFunctions.curl_curl_setopt_array,WordPress.WP.AlternativeFunctions.curl_curl_exec,WordPress.WP.AlternativeFunctions.curl_curl_close,WordPress.WP.AlternativeFunctions.curl_curl_errno,WordPress.WP.AlternativeFunctions.curl_curl_error
+ * phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose,WordPress.WP.AlternativeFunctions.unlink_unlink
+ *
+ * Justification: this class streams Server-Sent Events from the Anthropic
+ * API directly to the visitor's browser. wp_remote_get() / Requests cannot
+ * stream chunked responses — they buffer the entire body — so a direct
+ * cURL handle with CURLOPT_WRITEFUNCTION is required for the streaming
+ * chat UX. tempfile fclose() / unlink() pair with cURL handles and
+ * proc_open() pipes; WP_Filesystem operates on the WP uploads dir, not
+ * arbitrary tempfiles. proc_open() drives the optional Claude Code CLI
+ * processor, which an admin enables via the Settings → Connection toggle
+ * when self-hosting the binary; the default HTTP path does not invoke it.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -462,8 +478,9 @@ class Zen_Cortext_API {
         }
 
         $on_event = function ($json) {
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $json is wp_json_encode output emitted as SSE; escaping would corrupt the SSE protocol.
             echo "data: " . $json . "\n\n";
-            if (ob_get_level()) @ob_flush();
+            if (ob_get_level()) { @ob_flush(); }
             @flush();
         };
         if (self::processor() === 'cli') {
@@ -767,8 +784,9 @@ class Zen_Cortext_API {
                 }
 
                 // Happy path: pass straight to the client.
+                // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $data is a raw SSE chunk from Anthropic streamed through verbatim; escaping would corrupt the protocol.
                 echo $data;
-                if (ob_get_level()) @ob_flush();
+                if (ob_get_level()) { @ob_flush(); }
                 @flush();
 
                 // Server-side parse of the SSE stream so we can persist the
@@ -816,6 +834,7 @@ class Zen_Cortext_API {
         }
 
         if ($service_error_msg !== '') {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
             error_log('Zen Cortext stream_chat error — ' . $service_error_msg);
             self::notify_admin_ai_error(array(
                 'http_status' => $response_status,
@@ -967,6 +986,7 @@ class Zen_Cortext_API {
             $on_event(wp_json_encode(array('type' => 'error', 'error' => curl_error($ch))));
         } elseif ($response_status >= 400) {
             $msg = self::extract_anthropic_error_message($error_body, $response_status);
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
             error_log('Zen Cortext API stream: HTTP ' . $response_status . ' ' . $msg);
             $on_event(wp_json_encode(array(
                 'type'  => 'error',
@@ -1027,12 +1047,14 @@ class Zen_Cortext_API {
         $throttle = (int) apply_filters('zen_cortext_ai_error_email_throttle_sec', 1800);
         $last_at  = (int) get_transient('zen_cortext_ai_error_email_at');
         if ($last_at > 0 && (time() - $last_at) < $throttle) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
             error_log('Zen Cortext: AI error email throttled (last sent ' . (time() - $last_at) . 's ago)');
             return false;
         }
 
         $recipients = self::ai_error_email_recipients();
         if (!$recipients) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
             error_log('Zen Cortext: AI error — no admin recipients configured, email skipped.');
             return false;
         }

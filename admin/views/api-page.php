@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — unified API admin page.
  * Wrapper that emits the wrap + h1 + tab nav and includes the active

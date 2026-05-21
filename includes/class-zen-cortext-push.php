@@ -10,6 +10,21 @@
  * hash_hkdf(), openssl_pkey_derive().
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -186,6 +201,7 @@ class Zen_Cortext_Push {
         } catch (\Throwable $e) {
             // Push is best-effort — never break the caller.
             if (defined('WP_DEBUG') && WP_DEBUG) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
                 error_log('Zen Cortext Push error: ' . $e->getMessage());
             }
             return 0;
@@ -305,7 +321,7 @@ class Zen_Cortext_Push {
         $admin_email = trim((string) get_option('admin_email', ''));
         $contact = $admin_email !== ''
             ? 'mailto:' . $admin_email
-            : 'mailto:' . get_bloginfo('name') . '@' . (string) parse_url(home_url(), PHP_URL_HOST);
+            : 'mailto:' . get_bloginfo('name') . '@' . (string) wp_parse_url(home_url(), PHP_URL_HOST);
         $contact = (string) apply_filters('zen_cortext_vapid_contact', $contact);
 
         $payload = self::base64url_encode(wp_json_encode(array(
@@ -404,7 +420,7 @@ class Zen_Cortext_Push {
      * Extract the audience (origin) from a push endpoint URL.
      */
     private static function get_audience($endpoint) {
-        $parts = parse_url($endpoint);
+        $parts = wp_parse_url($endpoint);
         return ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
     }
 

@@ -890,6 +890,7 @@ class Zen_Cortext_Filter {
     private static function debug_log($tag, $raw) {
         if (!defined('WP_DEBUG') || !WP_DEBUG) return;
         $snippet = function_exists('mb_substr') ? mb_substr((string) $raw, 0, 200) : substr((string) $raw, 0, 200);
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
         error_log('[zc-classify] ' . $tag . ' | ' . $snippet);
     }
 }

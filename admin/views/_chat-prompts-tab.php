@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Chat settings → Prompts tab.
  *
@@ -180,8 +181,8 @@ if (!defined('ABSPATH')) exit;
     <p class="description">
         <?php
         printf(
-            /* translators: 1 = link to Basic tab (where the survey picker lives), 2 = link to Surveys page */
             wp_kses(
+                /* translators: %1$s is the link to the Basic tab (where the active-survey picker lives), %2$s is the link to the Surveys page. */
                 __('Pick the active survey on the %1$s tab; manage individual survey scripts on %2$s.', 'zen-cortext'),
                 array('a' => array('href' => array()))
             ),

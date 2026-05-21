@@ -476,6 +476,7 @@
 .zen-cortext-root .zc-send:hover:not(:disabled) { background: var(--zc-primary-hover); }
 .zen-cortext-root .zc-send:active:not(:disabled) { transform: translateY(1px); }
 .zen-cortext-root .zc-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.zen-cortext-root .zc-send-icon { display: none; }
 
 /* Voice input — mobile-only mic button. JS un-hides it from the
    `display:none` inline style after gating on viewport + capability;
@@ -675,6 +676,25 @@
     .zen-cortext-root .zc-bubble { max-width: 92%; font-size: 1em; padding: 12px 14px; }
     .zen-cortext-root .zc-input { font-size: 1em; padding: 12px 14px; }
     .zen-cortext-root .zc-send { font-size: 1em; padding: 12px 22px; }
+    /* Mobile send button: icon-only circle to match the mic. When voice
+       is enabled (.zc-mic-on on the row), JS swaps mic↔send based on
+       whether the textarea has text — see rules below. When voice is
+       disabled the send button stays visible at all times. */
+    .zen-cortext-root .zc-send {
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+        padding: 0;
+        border-radius: 50%;
+        align-self: flex-end;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .zen-cortext-root .zc-send-label { display: none; }
+    .zen-cortext-root .zc-send-icon  { display: inline-block; }
+    .zen-cortext-root .zc-input-row.zc-mic-on.zc-empty .zc-send { display: none; }
+    .zen-cortext-root .zc-input-row.zc-mic-on.zc-has-text .zc-mic { display: none; }
     .zen-cortext-root .zc-chip,
     .zen-cortext-root .zc-message-chip { font-size: 0.875em; padding: 8px 14px; }
     .zen-cortext-root .zc-intro-card { max-width: 100%; padding: 18px; }

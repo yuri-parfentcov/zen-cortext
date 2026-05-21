@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Chat settings → Basic tab.
  *
@@ -68,8 +69,8 @@ if (!defined('ABSPATH')) exit;
         <?php esc_html_e('Quick-reply buttons shown above the input when no Attribution Context rule overrides them. One chip per line. Chat picks 4 at random per visit. Empty = no chips shown.', 'zen-cortext'); ?>
         <br>
         <?php
-        /* translators: 1, 2, 3 are example chip lines wrapped in <code> */
         printf(
+            /* translators: %1$s is the full chip format example (emoji | label | message), %2$s and %3$s are the optional individual fields ("emoji" and "message"), each wrapped in <code>. */
             esc_html__('Format per line: %1$s — %2$s and %3$s are optional.', 'zen-cortext'),
             '<code>emoji | label | message</code>',
             '<code>emoji</code>',
@@ -96,6 +97,7 @@ if (!defined('ABSPATH')) exit;
         <?php
         printf(
             wp_kses(
+                /* translators: %1$s is the opening <a> tag pointing to the Surveys admin page, %2$s is the closing </a>. */
                 __('Optional interview script the AI weaves into the conversation when no Attribution Context rule overrides it. Manage scripts on %1$sZen Cortext → Surveys%2$s.', 'zen-cortext'),
                 array('a' => array('href' => array()))
             ),
@@ -126,8 +128,8 @@ if (!defined('ABSPATH')) exit;
     <p class="description" style="max-width:880px;">
         <?php
         printf(
-            /* translators: 1 = link to the Prompts tab, 2 = link to the Surveys page. */
             wp_kses(
+                /* translators: %1$s is the HTML link to the Prompts tab; %2$s is the HTML link to the Surveys page. */
                 __('The framing prompt that wraps the chosen survey lives on the %1$s tab. Manage individual survey scripts on %2$s.', 'zen-cortext'),
                 array('a' => array('href' => array()))
             ),

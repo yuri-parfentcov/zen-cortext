@@ -1595,9 +1595,21 @@
         applyViewOnlyMode();
 
         /* ---------- input wiring ---------- */
+        // .zc-empty / .zc-has-text on the row drives the mobile mic↔send
+        // swap (see chat.css). Init to empty + update on every input event,
+        // including programmatic ones (voice transcription dispatches input).
+        const inputRow = input.closest('.zc-input-row');
+        function updateInputRowState() {
+            if (!inputRow) return;
+            const hasText = (input.value || '').trim().length > 0;
+            inputRow.classList.toggle('zc-has-text', hasText);
+            inputRow.classList.toggle('zc-empty', !hasText);
+        }
+        updateInputRowState();
         input.addEventListener('input', function () {
             input.style.height = 'auto';
             input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+            updateInputRowState();
         });
         input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1641,6 +1653,11 @@
                 return;
             }
             micBtn.style.display = '';
+            // Tells CSS that the mic is live, so the mobile mic↔send swap
+            // rules apply. Without this class, the send icon stays visible
+            // at all times (which is what we want when voice is disabled).
+            const micRow = micBtn.closest('.zc-input-row');
+            if (micRow) micRow.classList.add('zc-mic-on');
 
             let recorder = null;
             let chunks = [];

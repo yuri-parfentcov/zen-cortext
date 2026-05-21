@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Getting Started (Initialization) admin page.
  *
@@ -40,15 +41,15 @@ $render_step = function ($key, $num, $title, $optional, $body_cb) use ($steps_by
         ? '<span class="zci-tag zci-tag-optional">' . esc_html__('Optional', 'zen-cortext') . '</span>'
         : '<span class="zci-tag zci-tag-required">' . esc_html__('Required', 'zen-cortext') . '</span>';
     ?>
-    <details class="zci-step zci-step-<?php echo esc_attr($done ? 'done' : 'pending'); ?>"<?php echo $open; ?>>
+    <details class="zci-step zci-step-<?php echo esc_attr($done ? 'done' : 'pending'); ?>"<?php echo esc_attr($open); ?>>
         <summary>
             <span class="zci-num"><?php echo (int) $num; ?></span>
             <span class="zci-title"><?php echo esc_html($title); ?></span>
-            <?php echo $tag; ?>
+            <?php echo wp_kses_post($tag); ?>
             <?php if ($subtext !== ''): ?>
                 <span class="zci-subtext"><?php echo esc_html($subtext); ?></span>
             <?php endif; ?>
-            <span class="zci-marker"><?php echo $marker; ?></span>
+            <span class="zci-marker"><?php echo wp_kses_post($marker); ?></span>
         </summary>
         <div class="zci-body">
             <?php $body_cb(); ?>
@@ -87,8 +88,8 @@ $test_chat_url = Zen_Cortext_Setup_State::first_chat_page_url();
             </span>
         <?php else: ?>
             <?php
-            /* translators: 1 = number done, 2 = total required */
             printf(
+                /* translators: %1$d is the number of completed required setup steps; %2$d is the total number of required steps. */
                 esc_html__('%1$d of %2$d required steps done', 'zen-cortext'),
                 (int) $state['required_done'],
                 (int) $state['required_total']
@@ -236,9 +237,9 @@ $test_chat_url = Zen_Cortext_Setup_State::first_chat_page_url();
             </p>
             <ul>
                 <li><?php
-                    /* translators: 1, 2 = links */
                     printf(
                         wp_kses(
+                            /* translators: %1$s is the link to the Groq API keys page. */
                             __('Groq (recommended): create a key at %1$s. Free tier covers thousands of minutes of audio.', 'zen-cortext'),
                             array('a' => array('href' => array(), 'target' => array(), 'rel' => array()))
                         ),
@@ -248,6 +249,7 @@ $test_chat_url = Zen_Cortext_Setup_State::first_chat_page_url();
                 <li><?php
                     printf(
                         wp_kses(
+                            /* translators: %1$s is the link to the OpenAI API keys page. */
                             __('OpenAI (fallback): create a key at %1$s. Paid per-minute pricing but very robust.', 'zen-cortext'),
                             array('a' => array('href' => array(), 'target' => array(), 'rel' => array()))
                         ),

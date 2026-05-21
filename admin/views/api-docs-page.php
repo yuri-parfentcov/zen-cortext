@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — API › Documentation tab.
  * Static reference for wp-json/zc/v1/*. Read-only by design:

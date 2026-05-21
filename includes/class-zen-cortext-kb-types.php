@@ -14,6 +14,21 @@
  * option; they're fully decoupled from this list.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -244,6 +259,7 @@ class Zen_Cortext_KB_Types {
                 return new WP_Error(
                     'zen_cortext_types_artifacts_in_use',
                     sprintf(
+                        /* translators: %d is the number of Knowledge Artifacts using this content type. */
                         _n(
                             '%d artifact uses this type. Open the Knowledge Artifacts tab and re-type it before deleting this content type.',
                             '%d artifacts use this type. Open the Knowledge Artifacts tab and re-type them before deleting this content type.',
@@ -267,6 +283,7 @@ class Zen_Cortext_KB_Types {
         if ($rows > 0 && !$force) {
             return new WP_Error(
                 'zen_cortext_types_in_use',
+                /* translators: %d is the number of Knowledge Base rows currently classified with this content type. */
                 sprintf(_n('%d KB row uses this type — reset and delete?', '%d KB rows use this type — reset and delete?', $rows, 'zen-cortext'), $rows),
                 array('kb_rows_affected' => $rows)
             );
@@ -307,6 +324,7 @@ class Zen_Cortext_KB_Types {
             return new WP_Error('zen_cortext_slug', __('Slug must be lowercase letters, digits, or underscores; start with a letter; 2-31 characters.', 'zen-cortext'));
         }
         if (in_array($slug, self::RESERVED_SLUGS, true)) {
+            /* translators: %s is the reserved slug the admin attempted to use. */
             return new WP_Error('zen_cortext_slug', sprintf(__('Slug "%s" is reserved.', 'zen-cortext'), $slug));
         }
         return true;

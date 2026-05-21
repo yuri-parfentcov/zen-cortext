@@ -176,10 +176,10 @@ class Zen_Cortext_Livechat_Auth {
             }
         }
         if ($header === '' && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
-            $header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+            $header = sanitize_text_field(wp_unslash((string) $_SERVER['HTTP_AUTHORIZATION']));
         }
         if ($header === '' && !empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+            $header = sanitize_text_field(wp_unslash((string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION']));
         }
 
         if (strpos($header, 'Bearer ') === 0) {

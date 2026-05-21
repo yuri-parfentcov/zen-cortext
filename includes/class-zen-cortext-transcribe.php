@@ -201,6 +201,7 @@ class Zen_Cortext_Transcribe {
     private static function log_failover($provider, $err) {
         if (!defined('WP_DEBUG') || !WP_DEBUG) return;
         $msg = is_wp_error($err) ? $err->get_error_message() : (string) $err;
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
         error_log('[zen-cortext] Voice transcribe failover from ' . $provider . ': ' . $msg);
     }
 }

@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Saved Chats list page.
  * Available: $result (rows, total, pages), $stats, $page, $search, $has_utm
@@ -121,10 +122,10 @@ $base_url = admin_url('admin.php?page=zen-cortext-chats');
                         <?php endif; ?>
                     </td>
                     <td><?php echo (int) $r['message_count']; ?></td>
-                    <td><?php echo zcc_pill($r['utm_source']); ?></td>
-                    <td><?php echo zcc_pill($r['utm_medium']); ?></td>
-                    <td><?php echo zcc_pill($r['utm_campaign']); ?></td>
-                    <td><?php echo $click_id !== '' ? zcc_pill($click_id, 'Click ID') : '<span class="zcc-pill-empty">—</span>'; ?></td>
+                    <td><?php echo wp_kses_post(zcc_pill($r['utm_source'])); ?></td>
+                    <td><?php echo wp_kses_post(zcc_pill($r['utm_medium'])); ?></td>
+                    <td><?php echo wp_kses_post(zcc_pill($r['utm_campaign'])); ?></td>
+                    <td><?php echo wp_kses_post($click_id !== '' ? zcc_pill($click_id, 'Click ID') : '<span class="zcc-pill-empty">—</span>'); ?></td>
                     <td><?php echo esc_html(substr($r['updated_at'], 0, 16)); ?></td>
                     <td class="zcc-row-actions">
                         <a href="<?php echo esc_url($view_url); ?>" class="button button-small"><?php esc_html_e('View', 'zen-cortext'); ?></a>
@@ -137,16 +138,18 @@ $base_url = admin_url('admin.php?page=zen-cortext-chats');
     <?php if ($result['pages'] > 1): ?>
         <div class="tablenav">
             <div class="tablenav-pages">
-                <span class="displaying-num"><?php echo sprintf(esc_html__('%d items', 'zen-cortext'), (int) $result['total']); ?></span>
+                <span class="displaying-num"><?php
+                    /* translators: %d is the total number of saved chats matching the current filters. */
+                    echo sprintf(esc_html__('%d items', 'zen-cortext'), (int) $result['total']); ?></span>
                 <?php
-                echo paginate_links(array(
+                echo wp_kses_post( paginate_links(array(
                     'base'      => add_query_arg('paged', '%#%'),
                     'format'    => '',
                     'current'   => $page,
                     'total'     => $result['pages'],
                     'prev_text' => '‹',
                     'next_text' => '›',
-                ));
+                )) );
                 ?>
             </div>
         </div>

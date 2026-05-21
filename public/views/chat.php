@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Inner chat shell — controller only.
  *
@@ -35,4 +36,5 @@ $context = array(
     ),
 );
 
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns the chat HTML template with placeholders replaced by sanitized strings.
 echo Zen_Cortext_Template_Renderer::render('chat.tpl.html', $context);

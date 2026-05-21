@@ -80,13 +80,13 @@ class Zen_Cortext_Shortcode {
             'zen-cortext-public',
             $chat_css_url,
             array(),
-            null  // version baked into asset_url() — passing null avoids ?ver=… being appended twice.
+            ZEN_CORTEXT_VERSION
         );
         wp_register_style(
             'zen-cortext-yanone',
             'https://fonts.googleapis.com/css2?family=Yanone+Kaffeesatz:wght@400;500;600;700&display=swap',
             array(),
-            null
+            ZEN_CORTEXT_VERSION
         );
         wp_register_script(
             'zen-cortext-public',
@@ -124,6 +124,7 @@ class Zen_Cortext_Shortcode {
         $color_override = self::build_color_override_style();
 
         ob_start();
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $color_override is a built <style> block of validated tokens.
         if ($color_override !== '') echo $color_override;
         // chat.php is a thin controller that calls the template renderer.
         // Preview-file routing is handled inside the renderer, not here.

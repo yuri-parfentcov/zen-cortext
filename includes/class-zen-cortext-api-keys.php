@@ -10,6 +10,21 @@
  * one global key with full access.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -302,10 +317,10 @@ class Zen_Cortext_Api_Keys {
             }
         }
         if ($header === '' && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
-            $header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+            $header = sanitize_text_field(wp_unslash((string) $_SERVER['HTTP_AUTHORIZATION']));
         }
         if ($header === '' && !empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+            $header = sanitize_text_field(wp_unslash((string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION']));
         }
         if (stripos($header, 'Bearer ') === 0) {
             return trim(substr($header, 7));

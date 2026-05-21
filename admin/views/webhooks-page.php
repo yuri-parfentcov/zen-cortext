@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Webhooks admin page.
  * CRUD list + editor for outbound JSON POSTs fired on chat events

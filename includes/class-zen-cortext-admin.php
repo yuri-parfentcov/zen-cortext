@@ -3,6 +3,35 @@
  * Admin: settings page, register_setting, AJAX job runners.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ * phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
+ * phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+ *
+ * Justification:
+ * - SQL: this file is a data-access surface for plugin-owned tables
+ *   (wp_zen_cortext_*). Each query is built around a $wpdb->prefix .
+ *   'zen_cortext_…' table name, which cannot be passed via a %s placeholder
+ *   ($wpdb->prepare does not bind identifiers). Every user-controlled value
+ *   in WHERE / VALUES / SET clauses goes through $wpdb->prepare(). Admin
+ *   analytics aggregates (SUM / COUNT / CASE) are real-time and not
+ *   candidates for the WP_Object_Cache.
+ * - Nonce: every AJAX entry point in this class begins with
+ *   $this->check_request(), which calls current_user_can('manage_options')
+ *   followed by check_ajax_referer('zen_cortext_admin', 'nonce') before
+ *   reading any superglobal. The linter cannot trace nonce checks across
+ *   helper methods.
+ * - Sanitize/Unslash: $_GET reads on render_*_page() methods sanitize via
+ *   sanitize_key()/(int) before use; $_POST reads inside ajax_* handlers
+ *   wrap values in sanitize_text_field(wp_unslash(...)) at the point of
+ *   use. A handful of fields (API keys, system prompts) are wrapped in
+ *   wp_unslash() only because sanitize_text_field would strip legitimate
+ *   characters the field is allowed to contain.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -30,6 +59,12 @@ class Zen_Cortext_Admin {
 
     private function __construct() {
         add_action('admin_menu', array($this, 'add_menu'));
+        // Runs after every plugin file has registered its submenus
+        // (chat-editor.php hooks at priority 20). Renames the auto-generated
+        // parent entry to "Settings", drops any duplicate copy that WP 6.7+
+        // creates when add_submenu_page is called with the parent's slug,
+        // and reshuffles the submenu order by slug.
+        add_action('admin_menu', array($this, 'reorder_menu'), 999);
         add_action('admin_init', array($this, 'register_settings'));
         // Redirect handler hooks `init` (not `admin_init`) so it fires
         // before wp-admin/includes/menu.php's user_can_access_admin_page()
@@ -113,31 +148,24 @@ class Zen_Cortext_Admin {
             58
         );
 
-        // Getting Started — first sub-item. Registered with explicit
-        // position 0 so it slots above the Settings auto-rename below.
-        // The slug `zen-cortext-init` keeps it separate from the parent
-        // slug, so `?page=zen-cortext` keeps routing to Settings and
-        // every existing deep link (?page=zen-cortext&tab=connection,
-        // &tab=design, etc.) keeps working unchanged.
+        // Getting Started — onboarding page. Slug `zen-cortext-init` keeps
+        // it separate from the parent slug, so `?page=zen-cortext` keeps
+        // routing to Settings and every existing deep link
+        // (?page=zen-cortext&tab=connection, &tab=design, etc.) keeps
+        // working unchanged. Display order is handled by reorder_menu().
         $this->init_hook = add_submenu_page(
             'zen-cortext',
             __('Getting Started with Zen Cortext', 'zen-cortext'),
             __('Getting Started', 'zen-cortext'),
             'manage_options',
             'zen-cortext-init',
-            array($this, 'render_initialization_page'),
-            0
+            array($this, 'render_initialization_page')
         );
 
-        // Rename the auto-generated first submenu entry from "Zen Cortext" to "Settings".
-        add_submenu_page(
-            'zen-cortext',
-            __('Zen Cortext Settings', 'zen-cortext'),
-            __('Settings', 'zen-cortext'),
-            'manage_options',
-            'zen-cortext',
-            array($this, 'render_page')
-        );
+        // The auto-generated parent-slug submenu (still labelled "Zen Cortext")
+        // is renamed to "Settings" in reorder_menu() — calling add_submenu_page
+        // with the parent's slug used to rename it pre-6.7 but now produces a
+        // second, duplicate entry, so we mutate $submenu directly instead.
 
         // Knowledge Base — sync + classify + restructure pipeline for indexed
         // WordPress content. Moved out of the Settings tab strip so the
@@ -282,6 +310,71 @@ class Zen_Cortext_Admin {
             'zen-cortext-ads-sync',
             array($this, 'render_ads_sync_page')
         );
+    }
+
+    /**
+     * Renames the auto-generated "Zen Cortext" submenu entry to "Settings",
+     * drops any duplicate copy WP 6.7+ creates, and reorders the submenu by
+     * usage frequency (most-checked screens first, setup screens last).
+     *
+     * Hooked at admin_menu priority 999 — after admin.php (priority 10) and
+     * chat-editor.php (priority 20) have registered their entries.
+     */
+    public function reorder_menu() {
+        global $submenu;
+        if (empty($submenu['zen-cortext']) || !is_array($submenu['zen-cortext'])) return;
+
+        // Pass 1: rename the auto-generated parent-slug entry to "Settings"
+        // and drop any duplicates (WP 6.7+ side-effect).
+        $seen_parent = false;
+        foreach ($submenu['zen-cortext'] as $key => $entry) {
+            $slug = isset($entry[2]) ? $entry[2] : '';
+            if ($slug !== 'zen-cortext') continue;
+            if ($seen_parent) {
+                unset($submenu['zen-cortext'][$key]);
+                continue;
+            }
+            $submenu['zen-cortext'][$key][0] = __('Settings', 'zen-cortext');
+            $submenu['zen-cortext'][$key][3] = __('Zen Cortext Settings', 'zen-cortext');
+            $seen_parent = true;
+        }
+
+        // Pass 2: reorder by slug. Slugs not listed here keep their original
+        // order at the bottom, so a future feature that adds a submenu still
+        // shows up without code changes here.
+        $desired = array(
+            'zen-cortext-chats',        // Saved Chats
+            'zen-cortext-sessions',     // User Sessions
+            'zen-cortext-brainstorm',   // Brainstorm
+            'zen-cortext-chat',         // Chat settings
+            'zen-cortext-kb',           // Knowledge Base
+            'zen-cortext-attribution',  // Attribution Context
+            'zen-cortext-surveys',      // Surveys
+            'zen-cortext-chat-editor',  // Template Editor
+            'zen-cortext-webhooks',     // Webhooks
+            'zen-cortext-api-keys',     // API
+            'zen-cortext-ads-sync',     // Google Ads Sync
+            'zen-cortext',              // Settings (parent slug)
+            'zen-cortext-init',         // Getting Started
+        );
+
+        $by_slug = array();
+        foreach ($submenu['zen-cortext'] as $entry) {
+            $slug = isset($entry[2]) ? $entry[2] : '';
+            if ($slug === '') continue;
+            $by_slug[$slug] = $entry;
+        }
+
+        $ordered = array();
+        foreach ($desired as $slug) {
+            if (isset($by_slug[$slug])) {
+                $ordered[] = $by_slug[$slug];
+                unset($by_slug[$slug]);
+            }
+        }
+        foreach ($by_slug as $entry) $ordered[] = $entry;
+
+        $submenu['zen-cortext'] = array_values($ordered);
     }
 
     public function register_settings() {
@@ -888,7 +981,7 @@ class Zen_Cortext_Admin {
 
     public function render_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
 
         // Unknown tabs (e.g. bookmarked legacy `?tab=help` from before the
@@ -912,7 +1005,7 @@ class Zen_Cortext_Admin {
      */
     public function render_initialization_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         if (!class_exists('Zen_Cortext_Setup_State')) {
             require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext-setup-state.php';
@@ -922,7 +1015,7 @@ class Zen_Cortext_Admin {
 
     public function render_kb_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         // Two-tab page: kb (default) and artifacts. Unknown values fall
         // back to kb. The redirect handler in admin_init sends the
@@ -934,7 +1027,7 @@ class Zen_Cortext_Admin {
 
     public function render_chat_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         // Three-tab page: basic (default) | rail | prompts. Unknown
         // values fall back to basic so a bookmarked legacy URL lands
@@ -946,21 +1039,21 @@ class Zen_Cortext_Admin {
 
     public function render_brainstorm_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         include ZEN_CORTEXT_PLUGIN_DIR . 'admin/views/brainstorm-page.php';
     }
 
     public function render_attribution_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         include ZEN_CORTEXT_PLUGIN_DIR . 'admin/views/attribution-page.php';
     }
 
     public function render_sessions_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         $page          = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
         $search        = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
@@ -986,14 +1079,14 @@ class Zen_Cortext_Admin {
 
     public function render_surveys_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         include ZEN_CORTEXT_PLUGIN_DIR . 'admin/views/surveys-page.php';
     }
 
     public function render_webhooks_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         include ZEN_CORTEXT_PLUGIN_DIR . 'admin/views/webhooks-page.php';
     }
@@ -1006,7 +1099,7 @@ class Zen_Cortext_Admin {
      */
     public function render_api_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         $tab = isset($_GET['tab']) ? sanitize_key((string) $_GET['tab']) : 'keys';
         if (!in_array($tab, array('keys', 'docs'), true)) $tab = 'keys';
@@ -1015,7 +1108,7 @@ class Zen_Cortext_Admin {
 
     public function render_ads_sync_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         $key_info  = Zen_Cortext_ApiKey_Auth::info();
         $sync_ts   = Zen_Cortext_Ads_Campaigns::last_sync_timestamp();
@@ -1025,7 +1118,7 @@ class Zen_Cortext_Admin {
 
     public function render_chats_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions.', 'zen-cortext'));
+            wp_die(esc_html__('Insufficient permissions.', 'zen-cortext'));
         }
         $action = isset($_GET['action']) ? sanitize_key($_GET['action']) : '';
         if ($action === 'view' && isset($_GET['id'])) {

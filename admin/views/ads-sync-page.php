@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Ads Sync admin page.
  * API key + Google Ads script (copy/paste) + read-only synced campaigns.
@@ -224,16 +225,16 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
     <ol class="zat-steps">
         <li><?php esc_html_e('Generate the API key above and copy it.', 'zen-cortext'); ?></li>
         <li><?php
-            /* translators: %s = "Tools and Settings → Bulk Actions → Scripts" */
             printf(
+                /* translators: %s is the menu path "Tools and Settings → Bulk Actions → Scripts" inside the Google Ads UI. */
                 esc_html__('In Google Ads, go to %s and click "+ New script" → "Empty script".', 'zen-cortext'),
                 '<strong>' . esc_html__('Tools and Settings → Bulk Actions → Scripts', 'zen-cortext') . '</strong>'
             );
         ?></li>
         <li><?php esc_html_e('Click "Copy script" below, then paste into the Google Ads script editor (replacing the empty template).', 'zen-cortext'); ?></li>
         <li><?php
-            /* translators: %s is the API_KEY constant name */
             printf(
+                /* translators: %s is the API_KEY constant name in the Google Ads script. */
                 esc_html__('At the top of the script, replace %s with the key you copied. The endpoint URL is already filled in for this site.', 'zen-cortext'),
                 '<code>API_KEY</code>'
             );
@@ -264,8 +265,8 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
     <p class="description" id="zat-ads-summary">
         <?php
         if ($sync_count > 0 && $sync_ts) {
-            /* translators: 1: number of campaigns, 2: datetime string */
             printf(
+                /* translators: %1$d is the number of synced Google Ads campaigns, %2$s is the last-sync datetime. */
                 esc_html__('%1$d campaigns. Last sync: %2$s.', 'zen-cortext'),
                 (int) $sync_count,
                 esc_html($sync_ts)

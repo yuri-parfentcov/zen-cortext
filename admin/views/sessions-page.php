@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — User Sessions list page.
  * Available: $result (rows, total, pages), $stats, $rules,
@@ -23,7 +24,7 @@ function zcs_pill($value) {
 function zcs_host_only($url) {
     $url = trim((string) $url);
     if ($url === '') return '';
-    $host = parse_url($url, PHP_URL_HOST);
+    $host = wp_parse_url($url, PHP_URL_HOST);
     return is_string($host) && $host !== '' ? $host : $url;
 }
 
@@ -72,7 +73,7 @@ if (is_array($rules)) {
                     <option value="0"><?php esc_html_e('— Any —', 'zen-cortext'); ?></option>
                     <?php foreach ($rules as $rule):
                         $rid = (int) $rule['id']; ?>
-                        <option value="<?php echo $rid; ?>" <?php selected($rule_id, $rid); ?>>
+                        <option value="<?php echo (int) $rid; ?>" <?php selected($rule_id, $rid); ?>>
                             <?php echo esc_html($rule['label']); ?>
                         </option>
                     <?php endforeach; ?>
@@ -112,20 +113,20 @@ if (is_array($rules)) {
                     : '';
                 $row_class = !empty($r['enriched']) ? 'zcs-enriched' : 'zcs-direct';
             ?>
-                <tr data-id="<?php echo $sid; ?>" class="<?php echo esc_attr($row_class); ?>">
+                <tr data-id="<?php echo (int) $sid; ?>" class="<?php echo esc_attr($row_class); ?>">
                     <td class="zcs-row-actions">
                         <button type="button" class="button button-small zcs-expand" aria-label="<?php esc_attr_e('Expand', 'zen-cortext'); ?>">+</button>
                         <button type="button" class="button button-small zcs-delete" aria-label="<?php esc_attr_e('Delete', 'zen-cortext'); ?>" title="<?php esc_attr_e('Delete session', 'zen-cortext'); ?>">×</button>
                     </td>
                     <td><?php echo esc_html(substr($r['last_seen_at'], 0, 16)); ?></td>
                     <td><?php echo esc_html(substr($r['first_seen_at'], 0, 16)); ?></td>
-                    <td><?php echo zcs_pill($src_med); ?></td>
-                    <td><?php echo zcs_pill($r['utm_campaign']); ?></td>
-                    <td><?php echo $click_id !== '' ? zcs_pill($click_id) : '<span class="zcs-pill-empty">—</span>'; ?></td>
+                    <td><?php echo wp_kses_post(zcs_pill($src_med)); ?></td>
+                    <td><?php echo wp_kses_post(zcs_pill($r['utm_campaign'])); ?></td>
+                    <td><?php echo wp_kses_post($click_id !== '' ? zcs_pill($click_id) : '<span class="zcs-pill-empty">—</span>'); ?></td>
                     <td>
                         <?php if ($r['landing_page'] !== ''): ?>
                             <span class="zcs-pill" title="<?php echo esc_attr($r['landing_page']); ?>">
-                                <?php echo esc_html(zcs_truncate(zcs_host_only($r['landing_page']) . (parse_url($r['landing_page'], PHP_URL_PATH) ?: ''), 36)); ?>
+                                <?php echo esc_html(zcs_truncate(zcs_host_only($r['landing_page']) . (wp_parse_url($r['landing_page'], PHP_URL_PATH) ?: ''), 36)); ?>
                             </span>
                         <?php else: ?><span class="zcs-pill-empty">—</span><?php endif; ?>
                     </td>
@@ -142,7 +143,7 @@ if (is_array($rules)) {
                         <?php else: ?><span class="zcs-pill-empty">0</span><?php endif; ?>
                     </td>
                 </tr>
-                <tr class="zcs-detail-row" data-detail-for="<?php echo $sid; ?>" style="display:none;">
+                <tr class="zcs-detail-row" data-detail-for="<?php echo (int) $sid; ?>" style="display:none;">
                     <td colspan="9" class="zcs-detail-cell">
                         <div class="zcs-detail-loading"><em><?php esc_html_e('Loading…', 'zen-cortext'); ?></em></div>
                     </td>
@@ -154,16 +155,18 @@ if (is_array($rules)) {
     <?php if ($result['pages'] > 1): ?>
         <div class="tablenav">
             <div class="tablenav-pages">
-                <span class="displaying-num"><?php echo sprintf(esc_html__('%d items', 'zen-cortext'), (int) $result['total']); ?></span>
+                <span class="displaying-num"><?php
+                    /* translators: %d is the total number of sessions matching the current filters. */
+                    echo sprintf(esc_html__('%d items', 'zen-cortext'), (int) $result['total']); ?></span>
                 <?php
-                echo paginate_links(array(
+                echo wp_kses_post( paginate_links(array(
                     'base'      => add_query_arg('paged', '%#%'),
                     'format'    => '',
                     'current'   => $page,
                     'total'     => $result['pages'],
                     'prev_text' => '‹',
                     'next_text' => '›',
-                ));
+                )) );
                 ?>
             </div>
         </div>

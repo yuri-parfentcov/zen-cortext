@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Surveys admin page.
  * CRUD list + editor for interview scripts that the AI weaves into chat

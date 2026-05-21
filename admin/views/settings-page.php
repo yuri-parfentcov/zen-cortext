@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Settings page (tabs).
  * Available: $tab
@@ -34,6 +35,7 @@ $tabs = array(
         // chat page" button has its own POST form to admin-post.php
         // and nested forms aren't valid HTML.
         $chat_pages   = Zen_Cortext_Design::list_chat_pages();
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- flash-message presence flag read after admin-post.php redirect; gated by current_user_can in the parent render method.
         $created_flag = isset($_GET['created']) ? sanitize_key((string) $_GET['created']) : '';
         ?>
         <p class="description" style="max-width:880px;">
@@ -167,6 +169,20 @@ $tabs = array(
                         <input type="number" id="zen_cortext_max_tokens" name="zen_cortext_max_tokens"
                                value="<?php echo esc_attr(get_option('zen_cortext_max_tokens', 2048)); ?>"
                                class="small-text" min="64" max="8192" />
+                        <p class="description">
+                            <?php esc_html_e('Upper bound on the response length (in tokens) for Anthropic HTTP API calls. Default: 2048. Allowed: 64–8192.', 'zen-cortext'); ?>
+                        </p>
+                        <p class="description">
+                            <strong><?php esc_html_e('Applies to:', 'zen-cortext'); ?></strong>
+                            <?php esc_html_e('visitor chat streaming, Knowledge Base restructure, Knowledge Artifact restructure, and artifact synthesis from a brainstorm transcript.', 'zen-cortext'); ?>
+                        </p>
+                        <p class="description">
+                            <strong><?php esc_html_e('Does NOT affect:', 'zen-cortext'); ?></strong>
+                            <?php esc_html_e('Claude Code CLI runs (the CLI manages its own output budget), the Brainstorm page (uses Opus 4.6 with a dedicated 24000-token cap for extended thinking), or short utility calls like classification (hardcoded small caps).', 'zen-cortext'); ?>
+                        </p>
+                        <p class="description">
+                            <?php esc_html_e('Higher = longer answers and KB rewrites, but more cost per call. Lower = tighter responses, cheaper, but risk of being truncated mid-sentence.', 'zen-cortext'); ?>
+                        </p>
                     </td>
                 </tr>
             </table>
@@ -228,8 +244,8 @@ $tabs = array(
                                value="<?php echo esc_attr($groq_api_key); ?>"
                                class="regular-text" autocomplete="off" />
                         <p class="description"><?php
-                            /* translators: %s is a link to the Groq console */
                             printf(
+                                /* translators: %s is the HTML link to the Groq API-keys console page. */
                                 esc_html__('Stored locally as a WP option. Get a key at %s — pricing is pay-as-you-go and Groq bills you directly.', 'zen-cortext'),
                                 '<a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>'
                             );
@@ -247,8 +263,8 @@ $tabs = array(
                                value="<?php echo esc_attr($openai_api_key); ?>"
                                class="regular-text" autocomplete="off" />
                         <p class="description"><?php
-                            /* translators: %s is a link to the OpenAI API key console */
                             printf(
+                                /* translators: %s is the HTML link to the OpenAI API-keys console page. */
                                 esc_html__('Used only if Groq fails (network or auth error). Get a key at %s. Leave blank to disable the fallback.', 'zen-cortext'),
                                 '<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a>'
                             );

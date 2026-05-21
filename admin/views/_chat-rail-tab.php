@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Chat settings → Left panel / modal menu tab.
  *
@@ -21,8 +22,8 @@ if (!defined('ABSPATH')) exit;
         <?php esc_html_e('Link cards rendered next to the visitor chat — vertical rail on desktop (left edge of /talk/), modal menu on mobile. One link per line.', 'zen-cortext'); ?>
         <br>
         <?php
-        /* translators: 1, 2 are example field tokens wrapped in <code> */
         printf(
+            /* translators: %1$s is the full rail-link format example (icon | prefix | label | url), %2$s is the literal optional "prefix" field, both wrapped in <code>. */
             esc_html__('Format: %1$s — %2$s is optional. All cards open in a new tab so visitors stay anchored on the chat page.', 'zen-cortext'),
             '<code>icon | prefix | label | url</code>',
             '<code>prefix</code>'
@@ -158,10 +159,10 @@ if (!defined('ABSPATH')) exit;
             $expertise_text = isset($team_expertise[$uid]) ? $team_expertise[$uid] : '';
         ?>
         <tr>
-            <th><label for="zen_cortext_team_expertise_<?php echo $uid; ?>"><?php echo esc_html($u->display_name); ?></label></th>
+            <th><label for="zen_cortext_team_expertise_<?php echo (int) $uid; ?>"><?php echo esc_html($u->display_name); ?></label></th>
             <td>
-                <textarea id="zen_cortext_team_expertise_<?php echo $uid; ?>"
-                          name="zen_cortext_team_expertise[<?php echo $uid; ?>]"
+                <textarea id="zen_cortext_team_expertise_<?php echo (int) $uid; ?>"
+                          name="zen_cortext_team_expertise[<?php echo (int) $uid; ?>]"
                           rows="4" class="large-text"><?php echo esc_textarea($expertise_text); ?></textarea>
             </td>
         </tr>

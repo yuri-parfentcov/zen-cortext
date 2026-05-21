@@ -3,6 +3,21 @@
  * Knowledge base storage and queries (custom table wp_zen_cortext_kb).
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -328,7 +343,7 @@ class Zen_Cortext_KB {
         // Resolve site-structure roles once, not per row.
         $site_roles = self::resolve_site_roles();
 
-        $site_host = (string) parse_url(home_url(), PHP_URL_HOST);
+        $site_host = (string) wp_parse_url(home_url(), PHP_URL_HOST);
         if ($site_host === '') $site_host = 'this site';
 
         $block  = "\n\n## Knowledge Base — Full Site Content\n";

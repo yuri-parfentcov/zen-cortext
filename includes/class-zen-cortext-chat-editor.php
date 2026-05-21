@@ -469,7 +469,7 @@ class Zen_Cortext_Chat_Editor {
         // Two saves in the same second would collide on second-precision
         // timestamps and corrupt the earlier snapshot. Append a counter
         // when needed so each snapshot lives in its own file.
-        $base = date('Ymd-His');
+        $base = gmdate('Ymd-His');
         $ts   = $base;
         $i    = 1;
         while (file_exists($vdir . $file . '.' . $ts)) {
@@ -502,7 +502,7 @@ class Zen_Cortext_Chat_Editor {
         $list = self::list_versions($file);
         $extra = array_slice($list, max(0, (int) $keep));
         foreach ($extra as $ts) {
-            @unlink($vdir . $file . '.' . $ts);
+            @unlink($vdir . $file . '.' . $ts); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- pruning plugin-managed version snapshot files in the uploads dir.
         }
     }
 

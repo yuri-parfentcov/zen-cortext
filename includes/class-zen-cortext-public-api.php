@@ -22,6 +22,21 @@
  * updated_at. See outcome_case_sql() for the full mapping.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -608,7 +623,8 @@ class Zen_Cortext_Public_API {
             if (!in_array($outcome, $allowed, true)) {
                 $msg = ($outcome === 'disqualified')
                     ? __('Outcome "disqualified" is not implemented in v1 (no signal exists yet).', 'zen-cortext')
-                    : sprintf(__('Unknown outcome "%s". Allowed: %s.', 'zen-cortext'), $outcome, implode(', ', $allowed));
+                    /* translators: %1$s is the unknown outcome name supplied by the caller, %2$s is the comma-separated list of allowed outcomes. */
+                    : sprintf(__('Unknown outcome "%1$s". Allowed: %2$s.', 'zen-cortext'), $outcome, implode(', ', $allowed));
                 return new WP_Error('zc_bad_outcome', $msg, array('status' => 400));
             }
             $where[] = '(' . self::outcome_case_sql() . ') = %s';

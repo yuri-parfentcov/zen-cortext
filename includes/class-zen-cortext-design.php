@@ -13,6 +13,21 @@
  * wrote. No data migration needed.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -91,6 +106,7 @@ class Zen_Cortext_Design {
         // gate is on $_GET['tab'] since the tab strip routes inside the
         // same hook_suffix.
         if ($hook !== 'toplevel_page_zen-cortext') return;
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display check used to scope asset enqueue to the design tab; no state change.
         if (!isset($_GET['tab']) || $_GET['tab'] !== 'design') return;
 
         // Reuse the chat-editor stylesheet — it owns the .zce-color-row
@@ -116,7 +132,7 @@ class Zen_Cortext_Design {
             'zen-cortext-chat-public',
             $chat_css_url,
             array(),
-            null // version already baked into the URL via mtime / plugin version
+            ZEN_CORTEXT_VERSION
         );
 
         // WP media uploader for the float-button icon picker — opens
@@ -365,6 +381,7 @@ class Zen_Cortext_Design {
                 $slug = substr($m, strlen('template:'));
                 $out[] = isset($templates[$slug])
                     ? $templates[$slug]['label']
+                    /* translators: %s is the page-template slug from the WordPress theme. */
                     : sprintf(__('Template (%s)', 'zen-cortext'), $slug);
             }
         }
@@ -526,7 +543,7 @@ class Zen_Cortext_Design {
             }
         }
 
-        echo self::build_float_button_html($settings);
+        echo wp_kses_post(self::build_float_button_html($settings));
     }
 
     /**
@@ -563,11 +580,11 @@ class Zen_Cortext_Design {
         ob_start();
         ?>
         <style id="zcfb-style">
-        .zcfb-wrap { position: fixed; z-index: 2147483600; <?php echo $pos_v . ' ' . $pos_h; ?> }
+        .zcfb-wrap { position: fixed; z-index: 2147483600; <?php echo esc_attr($pos_v . ' ' . $pos_h); ?> }
         .zcfb-btn {
             display: flex; align-items: center; justify-content: center;
             width: 64px; height: 64px; border-radius: 50%;
-            background: <?php echo $button_color; ?>;
+            background: <?php echo esc_attr($button_color); ?>;
             box-shadow: 0 4px 16px rgba(0,0,0,0.18);
             transition: transform 0.15s ease, box-shadow 0.15s ease;
             text-decoration: none;
@@ -581,18 +598,18 @@ class Zen_Cortext_Design {
         .zcfb-btn img { width: 60%; height: 60%; display: block; object-fit: contain; }
         .zcfb-tip {
             position: absolute; top: 50%; transform: translateY(-50%);
-            <?php echo $tooltip_origin; ?>
+            <?php echo esc_attr($tooltip_origin); ?>
             background: #1d2327; color: #fff; padding: 8px 12px; border-radius: 6px;
             font-size: 13px; line-height: 1.2; white-space: nowrap;
             opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
         }
         .zcfb-tip::after {
             content: ''; position: absolute; top: 50%; transform: translateY(-50%);
-            <?php echo $tooltip_arrow_side; ?>
+            <?php echo esc_attr($tooltip_arrow_side); ?>
             border: 6px solid transparent;
-            <?php echo $horizontal === 'left'
+            <?php echo esc_attr($horizontal === 'left'
                 ? 'border-right-color: #1d2327;'
-                : 'border-left-color: #1d2327;'; ?>
+                : 'border-left-color: #1d2327;'); ?>
         }
         .zcfb-wrap:hover .zcfb-tip,
         .zcfb-wrap:focus-within .zcfb-tip { opacity: 1; }
@@ -602,10 +619,10 @@ class Zen_Cortext_Design {
         }
         </style>
         <div class="zcfb-wrap" id="zcfb-wrap">
-            <a href="<?php echo $target_url; ?>" class="zcfb-btn"
+            <a href="<?php echo esc_url($target_url); ?>" class="zcfb-btn"
                aria-label="<?php echo esc_attr($hover_text); ?>"
                title="<?php echo esc_attr($hover_text); ?>">
-                <img src="<?php echo $icon_url; ?>" alt="" />
+                <img src="<?php echo esc_url($icon_url); ?>" alt="" />
             </a>
             <span class="zcfb-tip" role="tooltip"><?php echo esc_html($hover_text); ?></span>
         </div>

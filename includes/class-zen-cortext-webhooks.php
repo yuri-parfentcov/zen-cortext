@@ -83,7 +83,7 @@ class Zen_Cortext_Webhooks {
             return new WP_Error('zen_cortext_webhooks', __('A valid http(s) URL is required.', 'zen-cortext'));
         }
         $label  = isset($data['label'])  ? sanitize_text_field((string) $data['label']) : '';
-        if ($label === '') $label = parse_url($url, PHP_URL_HOST) ?: $url;
+        if ($label === '') $label = wp_parse_url($url, PHP_URL_HOST) ?: $url;
 
         $catalog = self::event_catalog();
         $events  = array();

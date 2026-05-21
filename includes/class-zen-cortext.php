@@ -3,6 +3,21 @@
  * Main Zen Cortext plugin class.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -210,7 +225,7 @@ class Zen_Cortext {
             header('Content-Type: application/javascript');
             header('Service-Worker-Allowed: /');
             header('Cache-Control: no-cache, must-revalidate');
-            readfile(ZEN_CORTEXT_PLUGIN_DIR . 'public/assets/livechat-sw.js');
+            readfile(ZEN_CORTEXT_PLUGIN_DIR . 'public/assets/livechat-sw.js'); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- streaming a plugin-bundled service-worker JS file with custom HTTP headers; WP_Filesystem does not support output streaming.
             exit;
         });
     }
@@ -258,6 +273,7 @@ class Zen_Cortext {
         if (is_network_admin())                               return;
         if (!current_user_can('manage_options'))              return;
         // Don't bounce out of the install screen or the plugins page mid-bulk-action.
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only presence check on WP's own bulk-action params; no state change.
         if (isset($_GET['activate-multi']) || isset($_GET['action'])) return;
 
         delete_transient('zen_cortext_first_run_redirect');

@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Saved Chat detail page.
  * Available:
@@ -165,7 +166,7 @@ $attribution_rows = array(
                             !empty($enrichment['classified_at'])
                                 ? 'Classified at ' . $enrichment['classified_at']
                                 : ''
-                        ); ?>"><?php echo implode(' · ', $parts); ?></div>
+                        ); ?>"><?php echo wp_kses_post(implode(' · ', $parts)); ?></div>
                     <?php endif; endif; ?>
                 </div>
             <?php endforeach; endif; ?>
@@ -229,6 +230,7 @@ $attribution_rows = array(
                 <div class="zcd-session-related">
                     <h3><?php
                         printf(
+                            /* translators: %d is the number of other visit sessions matched by IP hash. */
                             esc_html(_n('Other visit (%d)', 'Other visits (%d)', count($related_sessions), 'zen-cortext')),
                             count($related_sessions)
                         );
@@ -246,6 +248,7 @@ $attribution_rows = array(
                             <a href="<?php echo esc_url($sessions_url); ?>"><strong><?php echo esc_html($rs_label); ?></strong></a>
                             <?php if ((int) $rs['chat_count'] > 0): ?>
                                 <span class="zcd-related-chats"><?php
+                                    /* translators: %d is the number of chats in the related session. */
                                     printf(esc_html(_n('%d chat', '%d chats', (int) $rs['chat_count'], 'zen-cortext')), (int) $rs['chat_count']);
                                 ?></span>
                             <?php endif; ?>

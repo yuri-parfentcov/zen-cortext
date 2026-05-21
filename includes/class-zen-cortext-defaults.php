@@ -24,7 +24,7 @@ class Zen_Cortext_Defaults {
     public static function expand_placeholders($s) {
         $name    = trim((string) get_bloginfo('name'));
         $tagline = trim((string) get_bloginfo('description'));
-        $host    = (string) parse_url(home_url(), PHP_URL_HOST);
+        $host    = (string) wp_parse_url(home_url(), PHP_URL_HOST);
         $url     = home_url('/');
         $email   = trim((string) get_option('admin_email', ''));
 

@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — API › Keys tab.
  * Manages multi-key bearer-token auth for the external read API
@@ -15,8 +16,8 @@ if (!defined('ABSPATH')) exit;
         <?php esc_html_e('Bearer-token authentication for the external read API. Use these keys from your CRM, BI, or any downstream system that needs to read chats, leads, attribution rules, or knowledge base metadata via GET /wp-json/zc/v1/*.', 'zen-cortext'); ?>
         <br>
         <?php
-        /* translators: %s = API base URL */
         printf(
+            /* translators: %s is a <code>-wrapped base URL of the read-only REST API exposed by the plugin. */
             esc_html__('Base URL: %s', 'zen-cortext'),
             '<code id="zwk-base-url">' . esc_html(home_url('/wp-json/zc/v1')) . '</code>'
         );

@@ -93,7 +93,7 @@ class Zen_Cortext_Author_Bio {
         <div class="zen-ab">
             <div class="zen-ab-left">
                 <div class="zen-ab-avatar">
-                    <?php echo $avatar; ?>
+                    <?php echo wp_kses_post($avatar); ?>
                 </div>
                 <h3 class="zen-ab-name"><?php echo esc_html($name); ?></h3>
                 <?php if (!empty($role)) : ?>
@@ -140,7 +140,7 @@ class Zen_Cortext_Author_Bio {
 
             <?php if ($bio_html) : ?>
                 <div class="zen-ab-right">
-                    <?php echo $bio_html; ?>
+                    <?php echo wp_kses_post($bio_html); ?>
                 </div>
             <?php endif; ?>
         </div>

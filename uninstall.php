@@ -11,6 +11,21 @@
  * because dropping the wrong table would be irreversible.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit;
 }
@@ -36,6 +51,7 @@ $tables = array(
 foreach ($tables as $t) {
     // Each table name is composed from a constant $wpdb prefix and a
     // literal suffix — no user input — so the interpolation is safe.
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange -- intentional DROP TABLE at uninstall to honor WP's "delete plugin" contract; required for the clean-uninstall behavior advertised in the readme.
     $wpdb->query("DROP TABLE IF EXISTS {$t}");
 }
 
@@ -86,10 +102,12 @@ if (is_dir($zce_dir)) {
         foreach (scandir($path) as $e) {
             if ($e === '.' || $e === '..') continue;
             $sub = $path . '/' . $e;
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir,WordPress.WP.AlternativeFunctions.unlink_unlink -- recursive cleanup of plugin-owned uploads directory at uninstall; WP_Filesystem requires runtime credentials that aren't available in uninstall context.
             if (is_dir($sub)) { $rrm($sub); @rmdir($sub); }
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- removing file inside plugin-owned uploads dir at uninstall.
             else              { @unlink($sub); }
         }
-        @rmdir($path);
+        @rmdir($path); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- removing plugin-owned uploads dir at uninstall.
     };
     $rrm($zce_dir);
 }

@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Template Name: Zen Cortext — Live Chat Admin (PWA)
  *
@@ -32,6 +33,13 @@ $rest_root        = rest_url('zen-cortext/v1');
 $livechat_font_family = (string) get_option('zen_cortext_font_family', Zen_Cortext_Defaults::font_family());
 $livechat_load_yanone = (stripos($livechat_font_family, 'Yanone Kaffeesatz') !== false);
 ?>
+<?php
+// This is a standalone full-page template that owns the entire HTML document
+// (no theme header/footer, no wp_head/wp_footer). wp_enqueue_*() cannot
+// emit into a document we hand-rolled — the inline <link>/<script> tags
+// below are the correct pattern here.
+// phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet,WordPress.WP.EnqueuedResources.NonEnqueuedScript
+?>
 <?php if ($livechat_load_yanone): ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,5 +61,6 @@ window.zlcConfig = {
 };
 </script>
 <script src="<?php echo esc_url($livechat_js_url); ?>?ver=<?php echo esc_attr(ZEN_CORTEXT_VERSION); ?>"></script>
+<?php // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet,WordPress.WP.EnqueuedResources.NonEnqueuedScript ?>
 </body>
 </html>

@@ -6,6 +6,21 @@
  * They live alongside the post-derived KB and feed into the same chat context block.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -233,13 +248,16 @@ class Zen_Cortext_Artifacts {
 
         $placeholders = implode(',', array_fill(0, count($ids), '%d'));
         $table = self::table();
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT id, title, type, raw_content, structured FROM {$table} WHERE id IN ({$placeholders})",
-                $ids
-            ),
-            ARRAY_A
+        // phpcs:disable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+        // $placeholders is a runtime-built list of %d tokens (count matches $ids)
+        // for the IN() expansion; $wpdb->prepare receives them all in the
+        // second arg. The linter can't see through the variable-length list.
+        $sql = $wpdb->prepare(
+            "SELECT id, title, type, raw_content, structured FROM {$table} WHERE id IN ({$placeholders})",
+            $ids
         );
+        // phpcs:enable WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+        $rows = $wpdb->get_results($sql, ARRAY_A);
 
         // Re-order to match requested ID order.
         $by_id = array();

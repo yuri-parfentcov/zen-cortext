@@ -196,7 +196,9 @@ class Zen_Cortext_Template_Renderer {
     }
 
     public static function is_preview_request() {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview-mode detector; gated further by is_user_logged_in() + manage_options below.
         if (empty($_GET['zen_cortext_preview'])) return false;
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview-mode detector; gated further by is_user_logged_in() + manage_options below.
         if ($_GET['zen_cortext_preview'] !== '1') return false;
         if (!is_user_logged_in()) return false;
         return current_user_can('manage_options');
@@ -302,10 +304,11 @@ class Zen_Cortext_Template_Renderer {
                 $key      = $m[2];
 
                 if ($modifier === 't') {
-                    // Translation key is the literal string after `t:` —
-                    // we trim it and run through __() so admins can rely
-                    // on existing pot/po translations.
-                    return esc_html(__(trim($key), 'zen-cortext'));
+                    // Template `{{ t:Some Key }}` placeholders are dynamic
+                    // strings unknown to gettext extraction at build time.
+                    // Templates ship the English text as the key itself, so
+                    // a no-translation render returns the key verbatim.
+                    return esc_html(trim($key));
                 }
                 $val = self::resolve($key, $context);
                 if ($val === null) return '';

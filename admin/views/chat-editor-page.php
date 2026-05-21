@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Zen Cortext — Chat Template Editor admin page.
  * Two-tab editor scoped to the visitor /talk/ chat templates:
@@ -16,8 +17,8 @@ if (!defined('ABSPATH')) exit;
     <h1 class="zce-title"><?php esc_html_e('Template Editor', 'zen-cortext'); ?></h1>
     <p class="zce-subtitle">
         <?php
-        /* translators: %s = link to the Design admin page */
         printf(
+            /* translators: %s is the HTML link to the plugin's Design admin tab. */
             esc_html__('Edit the structure of the visitor chat templates. Template edits go through a staged preview before publish. For color overrides, use the dedicated %s page.', 'zen-cortext'),
             '<a href="' . esc_url(admin_url('admin.php?page=zen-cortext&tab=design')) . '">' . esc_html__('Design', 'zen-cortext') . '</a>'
         );
@@ -159,8 +160,8 @@ if (!defined('ABSPATH')) exit;
         <h2><?php esc_html_e('Recommended editing order', 'zen-cortext'); ?></h2>
         <ol>
             <li><?php
-            /* translators: %s = link to the Design admin page */
             printf(
+                /* translators: %s is the HTML link to the plugin's Design admin tab. */
                 esc_html__('Try the %s page first. Most "I want a different look" requests are color picks — done in 30 seconds, never touches a template file.', 'zen-cortext'),
                 '<a href="' . esc_url(admin_url('admin.php?page=zen-cortext&tab=design')) . '">' . esc_html__('Design', 'zen-cortext') . '</a>'
             );
@@ -210,8 +211,8 @@ if (!defined('ABSPATH')) exit;
         <h2><?php esc_html_e('How Colors flow into the live chat', 'zen-cortext'); ?></h2>
         <ol>
             <li><?php
-            /* translators: %s = link to the Design admin page */
             printf(
+                /* translators: %s is the HTML link to the plugin's Design admin tab. */
                 esc_html__('On the %s page, drag a picker → the mini-chat repaints instantly via inline style. Nothing is saved yet.', 'zen-cortext'),
                 '<a href="' . esc_url(admin_url('admin.php?page=zen-cortext&tab=design')) . '">' . esc_html__('Design', 'zen-cortext') . '</a>'
             );

@@ -1,4 +1,5 @@
 <?php
+if (!defined("ABSPATH")) { exit; }
 /**
  * Template Name: Zen Cortext — Full-page client chat
  *
@@ -146,9 +147,9 @@ foreach ($quick_links as $ql) {
     $ext_icon    = ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;vertical-align:middle;margin-left:2px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
     $prefix      = !empty($ql['prefix']) ? '<span class="zcp-rail-btn-prefix">' . esc_html($ql['prefix']) . '</span> ' : '';
     ?>
-    <a class="zcp-rail-btn" href="<?php echo esc_url($ql['href']); ?>"<?php echo $target_attr; ?>>
+    <a class="zcp-rail-btn" href="<?php echo esc_url($ql['href']); ?>"<?php echo $target_attr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- hardcoded attribute fragment, safe. ?>>
         <span class="zcp-rail-btn-icon" aria-hidden="true"><?php echo esc_html($ql['icon']); ?></span>
-        <span class="zcp-rail-btn-label"><?php echo $prefix . esc_html($ql['label']) . $ext_icon; ?></span>
+        <span class="zcp-rail-btn-label"><?php echo wp_kses_post($prefix . esc_html($ql['label']) . $ext_icon); ?></span>
     </a>
 <?php }
 $buttons_html = ob_get_clean();
@@ -181,6 +182,11 @@ $chat_font_size_px  = $chat_font_size_opt > 0
 
 $load_yanone_font = (stripos($chat_font_family, 'Yanone Kaffeesatz') !== false);
 ?>
+<?php
+// Standalone chat page owns the whole document — no wp_head/wp_footer,
+// so wp_enqueue_*() cannot apply. Inline tags are the correct pattern.
+// phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet,WordPress.WP.EnqueuedResources.NonEnqueuedScript
+?>
 <?php if ($load_yanone_font): ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -191,7 +197,7 @@ $load_yanone_font = (stripos($chat_font_family, 'Yanone Kaffeesatz') !== false);
 // Per-site --zc-* overrides set in the Chat Editor → Colors panel. Echoed
 // AFTER chat.css so cascade beats the published defaults. Empty string
 // when no overrides are configured, so this is a no-op on default sites.
-echo Zen_Cortext_Shortcode::build_color_override_style();
+echo Zen_Cortext_Shortcode::build_color_override_style(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- returns a hardcoded <style> block built from validated hex/rgba values.
 ?>
 <style>
 /* Hard reset — we own this page completely. */
@@ -204,7 +210,7 @@ body.zcp-body {
        fresh installs without saved color overrides still look right. */
     background: var(--zc-bg, #ffffff) !important;
     color: var(--zc-text, #3c434a);
-    font-family: <?php echo wp_strip_all_tags($chat_font_family); ?>;
+    font-family: <?php echo esc_attr( wp_strip_all_tags($chat_font_family) ); ?>;
     font-size: <?php echo (int) $chat_font_size_px; ?>px;
     line-height: 1.2;
     min-height: 100dvh;
@@ -489,13 +495,15 @@ ob_start();
 include ZEN_CORTEXT_PLUGIN_DIR . 'public/views/chat.php';
 $chat_html = ob_get_clean();
 
-echo Zen_Cortext_Template_Renderer::render('chat-page-body.tpl.html', array(
+$zc_chat_page_body = Zen_Cortext_Template_Renderer::render('chat-page-body.tpl.html', array(
     'rail_buttons_html'    => $buttons_html, // already sanitized at construction time
     'chat_html'            => $chat_html,
     'mobile_trigger_icon'  => '/biometrics.png',
     'quick_actions_label'  => __('Quick actions', 'zen-cortext'),
     'mobile_open_label'    => __('Open quick actions menu', 'zen-cortext'),
 ));
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns the full chat-page body HTML built from a template; vars are sanitized at construction.
+echo $zc_chat_page_body;
 ?>
 
 <script>
@@ -557,6 +565,7 @@ window.zenCortextConfig = {
 })();
 </script>
 <script src="<?php echo esc_url($chat_js_url); ?>?ver=<?php echo esc_attr(ZEN_CORTEXT_VERSION); ?>"></script>
+<?php // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet,WordPress.WP.EnqueuedResources.NonEnqueuedScript ?>
 
 <?php
 /* OPTIONAL — to add tracking or other plugins back, uncomment:

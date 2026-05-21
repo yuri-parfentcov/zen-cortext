@@ -1,6 +1,6 @@
-# Zen Cortext
+# Zen Cortext — Your AI SDR for inbound
 
-**An AI sales consultant for your WordPress site that answers from YOUR content, not generic AI knowledge.**
+**An AI SDR that reads your site, talks to your visitors, and knows when to call you.**
 
 ![The visitor chat in action](docs/screenshots/visitor-chat.png)
 
@@ -10,7 +10,7 @@ Zen Cortext turns your published pages, posts, FAQs, and case studies into a kno
 - **Bring your own Anthropic API key** — no markup, no proxy server, no third-party data sharing. The chat talks to Anthropic directly from your WordPress host.
 - **Lives entirely in your WordPress install** — every conversation, lead, and analytic event is stored in your own database. Uninstall the plugin and it all goes with it.
 
-> **Current version:** 2.34.16 · **License:** GPL v2 or later · **WordPress:** 5.9+ · **PHP:** 7.4+
+> **Current version:** 2.35.0 · **License:** GPL v2 or later · **WordPress:** 5.9+ · **PHP:** 7.4+
 
 ---
 

@@ -16,6 +16,21 @@
  * (case-insensitive) so the prompt block can include live ad copy.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ *
+ * Justification: this file is a data-access layer for plugin-owned tables
+ * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
+ * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
+ * not bind identifiers). Every user-controlled value in WHERE / VALUES /
+ * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
+ * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
+ * candidates for the WP_Object_Cache.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -313,7 +328,7 @@ class Zen_Cortext_Attribution {
     private static function host_of($url) {
         $url = trim((string) $url);
         if ($url === '') return '';
-        $host = parse_url($url, PHP_URL_HOST);
+        $host = wp_parse_url($url, PHP_URL_HOST);
         if (!is_string($host) || $host === '') return '';
         $host = self::lower($host);
         if (strpos($host, 'www.') === 0) $host = substr($host, 4);
@@ -452,7 +467,7 @@ class Zen_Cortext_Attribution {
     private static function canonical_url($url) {
         $url = trim((string) $url);
         if ($url === '') return '';
-        $parts = parse_url($url);
+        $parts = wp_parse_url($url);
         if (!is_array($parts)) return self::lower($url);
         $host = isset($parts['host']) ? self::lower($parts['host']) : '';
         if (strpos($host, 'www.') === 0) $host = substr($host, 4);

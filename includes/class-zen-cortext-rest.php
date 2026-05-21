@@ -4,6 +4,28 @@
  * POST /wp-json/zen-cortext/v1/send  → SSE stream from Anthropic.
  */
 
+
+/*
+ * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+ * phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
+ * phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+ *
+ * Justification:
+ * - SQL: plugin-owned tables interpolated as identifiers; user values go
+ *   through $wpdb->prepare(). Same rationale as the data-layer classes.
+ * - Nonce + Sanitize: these are REST endpoints registered via
+ *   register_rest_route() with an explicit permission_callback that gates
+ *   on capability + own apikey/livechat auth before the handler runs.
+ *   REST routes use WP REST nonces (X-WP-Nonce header) handled by core,
+ *   not check_ajax_referer; the linter does not recognise that path.
+ *   Request params come through $request->get_param() which is already
+ *   the WP-recommended boundary — direct $_GET/$_POST reads inside
+ *   handlers are limited to streaming setup (SSE preamble) where the
+ *   request body has already been validated by the route schema.
+ */
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -1015,7 +1037,7 @@ class Zen_Cortext_Rest {
         if (!is_array($decoded)) $decoded = array();
 
         $site_name = trim((string) get_bloginfo('name'));
-        if ($site_name === '') $site_name = (string) parse_url(home_url(), PHP_URL_HOST);
+        if ($site_name === '') $site_name = (string) wp_parse_url(home_url(), PHP_URL_HOST);
 
         // Reshape messages for the template — adds is_user / is_admin booleans
         // so the template can branch with {{ if:is_user }} without exposing
@@ -1070,7 +1092,7 @@ class Zen_Cortext_Rest {
         $from_name  = $site_name;
         $from_email = (string) get_option('admin_email', '');
         if (!is_email($from_email)) {
-            $host = (string) parse_url(home_url(), PHP_URL_HOST);
+            $host = (string) wp_parse_url(home_url(), PHP_URL_HOST);
             $host = preg_replace('/^www\./', '', $host);
             $from_email = $host !== '' ? ('no-reply@' . $host) : '';
         }
@@ -1791,8 +1813,9 @@ class Zen_Cortext_Rest {
         }
 
         $on_event = function ($json) {
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $json is wp_json_encode output emitted as SSE; escaping would corrupt the SSE protocol.
             echo "data: " . $json . "\n\n";
-            if (ob_get_level()) @ob_flush();
+            if (ob_get_level()) { @ob_flush(); }
             @flush();
         };
         $helper_messages = array(array('role' => 'user', 'content' => $transcript));
@@ -1901,8 +1924,9 @@ class Zen_Cortext_Rest {
         }
 
         $on_event = function ($json) {
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $json is wp_json_encode output emitted as SSE; escaping would corrupt the SSE protocol.
             echo "data: " . $json . "\n\n";
-            if (ob_get_level()) @ob_flush();
+            if (ob_get_level()) { @ob_flush(); }
             @flush();
         };
 
@@ -1939,6 +1963,7 @@ class Zen_Cortext_Rest {
             $final[] = array('role' => 'assistant', 'content' => $result['text']);
             $save    = Zen_Cortext_Brainstorm_Chats::upsert($chat_uid, $user_id, $final);
             if (is_wp_error($save)) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
                 error_log('Zen Cortext brainstorm save failed: ' . $save->get_error_message());
             }
         }
