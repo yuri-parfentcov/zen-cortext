@@ -149,7 +149,10 @@ foreach ($quick_links as $ql) {
     ?>
     <a class="zcp-rail-btn" href="<?php echo esc_url($ql['href']); ?>"<?php echo $target_attr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- hardcoded attribute fragment, safe. ?>>
         <span class="zcp-rail-btn-icon" aria-hidden="true"><?php echo esc_html($ql['icon']); ?></span>
-        <span class="zcp-rail-btn-label"><?php echo wp_kses_post($prefix . esc_html($ql['label']) . $ext_icon); ?></span>
+        <span class="zcp-rail-btn-label"><?php
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $prefix and $ext_icon are hardcoded markup built above ($prefix wraps esc_html'd text; $ext_icon is a static external-link SVG); $ql['label'] is esc_html'd inline. wp_kses_post would strip the SVG.
+            echo $prefix . esc_html($ql['label']) . $ext_icon;
+        ?></span>
     </a>
 <?php }
 $buttons_html = ob_get_clean();
@@ -210,7 +213,10 @@ body.zcp-body {
        fresh installs without saved color overrides still look right. */
     background: var(--zc-bg, #ffffff) !important;
     color: var(--zc-text, #3c434a);
-    font-family: <?php echo esc_attr( wp_strip_all_tags($chat_font_family) ); ?>;
+    font-family: <?php
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- echoed inside a <style> block; wp_strip_all_tags removes any HTML, and esc_attr() would HTML-encode the ' and , characters that legitimate font-family stacks need (e.g. 'Yanone Kaffeesatz', sans-serif).
+        echo wp_strip_all_tags($chat_font_family);
+    ?>;
     font-size: <?php echo (int) $chat_font_size_px; ?>px;
     line-height: 1.2;
     min-height: 100dvh;
