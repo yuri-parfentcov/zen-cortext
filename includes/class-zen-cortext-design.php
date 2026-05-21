@@ -543,7 +543,8 @@ class Zen_Cortext_Design {
             }
         }
 
-        echo wp_kses_post(self::build_float_button_html($settings));
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- build_float_button_html() already escapes its inputs (esc_url on URLs, hex regex on $button_color, int-clamp on $padding, enum check on positions) and emits a scoped <style> block that wp_kses_post would strip.
+        echo self::build_float_button_html($settings);
     }
 
     /**
