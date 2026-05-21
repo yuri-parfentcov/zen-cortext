@@ -578,14 +578,21 @@ class Zen_Cortext_Design {
         $tooltip_origin = $horizontal === 'left' ? 'left: calc(100% + 12px);' : 'right: calc(100% + 12px);';
         $tooltip_arrow_side = $horizontal === 'left' ? 'right: 100%;' : 'left: 100%;';
 
+        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
+        // The inline-CSS echoes in this <style> block are in CSS context,
+        // not HTML attribute context. Inputs are: integer-clamped $padding
+        // (0-200), enum-checked vertical/horizontal, hex-regex $button_color,
+        // and hardcoded literals. esc_attr() here would mangle quotes /
+        // commas / parens if any future tweak introduces them — cf. the
+        // 'Yanone Kaffeesatz' font-family bug on the chat-page template.
         ob_start();
         ?>
         <style id="zcfb-style">
-        .zcfb-wrap { position: fixed; z-index: 2147483600; <?php echo esc_attr($pos_v . ' ' . $pos_h); ?> }
+        .zcfb-wrap { position: fixed; z-index: 2147483600; <?php echo $pos_v . ' ' . $pos_h; ?> }
         .zcfb-btn {
             display: flex; align-items: center; justify-content: center;
             width: 64px; height: 64px; border-radius: 50%;
-            background: <?php echo esc_attr($button_color); ?>;
+            background: <?php echo $button_color; ?>;
             box-shadow: 0 4px 16px rgba(0,0,0,0.18);
             transition: transform 0.15s ease, box-shadow 0.15s ease;
             text-decoration: none;
@@ -599,18 +606,18 @@ class Zen_Cortext_Design {
         .zcfb-btn img { width: 60%; height: 60%; display: block; object-fit: contain; }
         .zcfb-tip {
             position: absolute; top: 50%; transform: translateY(-50%);
-            <?php echo esc_attr($tooltip_origin); ?>
+            <?php echo $tooltip_origin; ?>
             background: #1d2327; color: #fff; padding: 8px 12px; border-radius: 6px;
             font-size: 13px; line-height: 1.2; white-space: nowrap;
             opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
         }
         .zcfb-tip::after {
             content: ''; position: absolute; top: 50%; transform: translateY(-50%);
-            <?php echo esc_attr($tooltip_arrow_side); ?>
+            <?php echo $tooltip_arrow_side; ?>
             border: 6px solid transparent;
-            <?php echo esc_attr($horizontal === 'left'
+            <?php echo $horizontal === 'left'
                 ? 'border-right-color: #1d2327;'
-                : 'border-left-color: #1d2327;'); ?>
+                : 'border-left-color: #1d2327;'; ?>
         }
         .zcfb-wrap:hover .zcfb-tip,
         .zcfb-wrap:focus-within .zcfb-tip { opacity: 1; }
@@ -629,5 +636,6 @@ class Zen_Cortext_Design {
         </div>
         <?php
         return ob_get_clean();
+        // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
     }
 }
