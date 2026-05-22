@@ -1,5 +1,5 @@
 === Zen Cortext - Your AI SDR for inbound ===
-Contributors: zenrepublic
+Contributors: infozenrepublices
 Tags: chatbot, ai chat, lead generation, knowledge base, customer support
 Requires at least: 5.9
 Tested up to: 7.0
