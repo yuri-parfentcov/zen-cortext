@@ -101,14 +101,28 @@ We don't quote specific dollar amounts because Anthropic adjusts pricing periodi
 
 ## Install
 
-1. Download the latest release from this repo, or clone it into `wp-content/plugins/zen-cortext/`:
-   ```bash
-   cd wp-content/plugins
-   git clone https://github.com/yuri-parfentcov/zen-cortext.git
-   ```
-2. Go to **Plugins** in your WordPress admin and activate **Zen Cortext**.
-3. WordPress redirects you to the **Getting Started** page on first activation.
-4. Follow the steps in order. The page tracks your progress and shows a ✓ next to completed steps.
+### Recommended — upload the release zip in WP admin
+
+1. Open the [**latest release**](https://github.com/yuri-parfentcov/zen-cortext/releases/latest) and download the `zen-cortext-<version>.zip` asset (e.g. `zen-cortext-2.39.13.zip`).
+   > Use this attached asset, **not** the green *Code → Download ZIP* button. The release asset is the clean distribution package — it installs into the correct `zen-cortext/` folder and excludes development files (`.git`, `docs/`, `README.md`). The repo's auto-generated ZIP names the folder `zen-cortext-main` and bundles dev files, which breaks clean updates.
+2. In WordPress admin, go to **Plugins → Add New → Upload Plugin**.
+3. Choose the downloaded zip, click **Install Now**, then **Activate**.
+
+### Alternative — clone with git
+
+For servers where you manage plugins with git (gives a clean `zen-cortext/` folder and `git pull` updates):
+
+```bash
+cd wp-content/plugins
+git clone https://github.com/yuri-parfentcov/zen-cortext.git
+```
+
+Then activate **Zen Cortext** under **Plugins** in the WP admin.
+
+### After activation
+
+1. WordPress redirects you to the **Getting Started** page on first activation.
+2. Follow the steps in order. The page tracks your progress and shows a ✓ next to completed steps.
 
 ![The Getting Started admin page](docs/screenshots/admin-getting-started.png)
 
