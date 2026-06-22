@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) exit;
 <div class="wrap zen-cortext-wrap zen-cortext-brainstorm">
     <h1><?php esc_html_e('Zen Cortext — Brainstorm', 'zen-cortext'); ?></h1>
     <p class="description">
-        <?php esc_html_e('Internal chat for ideation and content drafting. Uses Claude Opus 4.6 with extended thinking, grounded in the same Knowledge Base, Knowledge Artifacts, and Team Expertise the visitor chat sees. Conversations are saved automatically — pick one from the sidebar to continue.', 'zen-cortext'); ?>
+        <?php esc_html_e('Internal chat for ideation and content drafting. Pick a model below (Opus for deepest reasoning, Sonnet or Haiku to save cost), grounded in the same Knowledge Base, Knowledge Artifacts, and Team Expertise the visitor chat sees. Conversations are saved automatically — pick one from the sidebar to continue.', 'zen-cortext'); ?>
     </p>
 
     <div id="zcb-root" class="zcb-root">
@@ -30,13 +30,24 @@ if (!defined('ABSPATH')) exit;
             <div class="zcb-toolbar">
                 <span class="zcb-meta">
                     <?php
-                    $zcb_processor = get_option('zen_cortext_processor', 'api');
-                    $zcb_backend   = $zcb_processor === 'cli' ? 'Claude Code CLI' : 'Anthropic API';
-                    $zcb_model     = $zcb_processor === 'cli' ? 'opus' : 'claude-opus-4-6';
-                    $zcb_caching   = $zcb_processor === 'cli' ? 'auto' : 'ephemeral';
+                    // Backend label is filterable so the optional CLI companion
+                    // plugin can advertise itself; the core plugin is API-only.
+                    $zcb_backend   = apply_filters('zen_cortext_backend_label', 'Anthropic API (billed)');
+                    $zcb_caching   = apply_filters('zen_cortext_backend_caching', 'ephemeral');
+                    $zcb_models    = Zen_Cortext_API::brainstorm_models();
+                    $zcb_default   = Zen_Cortext_API::BRAINSTORM_MODEL;
                     ?>
                     <span class="zcb-meta-item"><?php esc_html_e('Backend:', 'zen-cortext'); ?> <code><?php echo esc_html($zcb_backend); ?></code></span>
-                    <span class="zcb-meta-item"><?php esc_html_e('Model:', 'zen-cortext'); ?> <code><?php echo esc_html($zcb_model); ?></code></span>
+                    <span class="zcb-meta-item">
+                        <label for="zcb-model"><?php esc_html_e('Model:', 'zen-cortext'); ?></label>
+                        <select id="zcb-model" class="zcb-model-select">
+                            <?php foreach ($zcb_models as $zcb_id => $zcb_m) : ?>
+                                <option value="<?php echo esc_attr($zcb_id); ?>" <?php selected($zcb_id, $zcb_default); ?>>
+                                    <?php echo esc_html($zcb_m['label']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </span>
                     <span class="zcb-meta-item"><?php esc_html_e('Caching:', 'zen-cortext'); ?> <code><?php echo esc_html($zcb_caching); ?></code></span>
                     <span class="zcb-meta-item zcb-usage" id="zcb-usage" hidden></span>
                 </span>

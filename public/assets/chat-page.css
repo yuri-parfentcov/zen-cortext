@@ -1,0 +1,296 @@
+/*
+ * Zen Cortext — standalone full-page chat template chrome.
+ *
+ * Page layout for the "Full-page client chat" template: hard reset, main
+ * chat column, desktop floating quick-action rail, team/quick-link cards,
+ * and the mobile menu trigger + modal. Loaded via wp_enqueue_style on the
+ * chat-page template only.
+ *
+ * The body font-family / font-size are NOT here — they come from the Design
+ * settings (zen_cortext_font_family / font_size) and are emitted as inline
+ * CSS via wp_add_inline_style() so admins control them without editing this
+ * file. Color/token overrides arrive the same way (the --zc-* design layer).
+ */
+
+/* Hard reset — we own this page completely. */
+html, body { margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; }
+
+body.zcp-body {
+    /* !important keeps a host theme's body rule from overriding the
+       chat page's own background — fallback matches chat.css :root so
+       fresh installs without saved color overrides still look right.
+       font-family / font-size are injected inline from Design settings. */
+    background: var(--zc-bg, #ffffff) !important;
+    color: var(--zc-text, #3c434a);
+    line-height: 1.2;
+    min-height: 100dvh;
+}
+.zcp-page { min-height: 100dvh; display: flex; flex-direction: column; background: var(--zc-bg, #ffffff); }
+
+/* ----- Main (chat container) — no header / no footer chrome ----- */
+.zcp-main {
+    flex: 1 0 auto;
+    width: 100%;
+    max-width: 950px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    background: var(--zc-bg, #ffffff);
+}
+/* On desktop, keep the chat clear of the floating left rail (rail width 300px
+   + 24px left offset + 24px gap = 348px). On wide enough viewports the chat
+   re-centers naturally. */
+@media (min-width: 900px) {
+    .zcp-main {
+        margin-left: max(348px, calc(50% - 475px));
+        margin-right: 24px;
+    }
+}
+.zcp-main .zen-cortext-root {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* =====================================================================
+   Desktop floating quick-action rail (left edge, vertically centered)
+   ===================================================================== */
+.zcp-rail {
+    position: fixed;
+    top: 50%;
+    left: 24px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 50;
+    width: 300px;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* --- Team member cards --- */
+.zcp-team-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    background: var(--zc-surface, #ffffff);
+    border: 1px solid var(--zc-border, #c3c4c7);
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.zcp-team-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.zcp-team-role {
+    font-size: 1em;
+    color: var(--zc-text-muted, #646970);
+    line-height: 1.35;
+}
+a.zcp-team-left, .zcp-team-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 6px;
+    text-decoration: none;
+    color: inherit;
+}
+a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
+.zcp-team-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.zcp-team-name {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--zc-text-strong, #1d2327);
+    line-height: 1.2;
+    text-align: center;
+    max-width: 86px;
+    word-wrap: break-word;
+}
+.zcp-team-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
+.zcp-team-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 1em;
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1;
+    transition: background .15s, color .15s;
+    position: relative;
+    font-family: inherit;
+}
+.zcp-team-btn svg { flex-shrink: 0; width: 17px; height: 17px; }
+.zcp-team-btn-email { background: #f0f0f0; color: #333; }
+.zcp-team-btn-email:hover { background: #e2e2e2; color: #111; }
+.zcp-team-btn-wa { background: #25d366; color: #fff; }
+.zcp-team-btn-wa:hover { background: #1fb855; color: #fff; }
+.zcp-team-btn-li { background: #0A66C2; color: #fff; }
+.zcp-team-btn-li:hover { background: #004182; color: #fff; }
+.zcp-team-toast {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.6875em;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+}
+.zcp-team-toast.zcp-show { opacity: 1; }
+
+/* --- Quick link buttons ---
+   No left-border stripe — the previous 3px olive stripe was hardcoded
+   to one palette and the user has rejected left-stripe accents on
+   cards in general. Hover swaps the full border to --zc-accent so the
+   brand color still lands on interaction without committing one side
+   of the card to a palette-specific value. */
+.zcp-rail-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 18px;
+    background: var(--zc-surface, #ffffff);
+    border: 1px solid var(--zc-border, #c3c4c7);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--zc-text, #3c434a);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: background-color .15s, border-color .15s, transform .12s, box-shadow .15s;
+    font-family: inherit;
+    line-height: 1.2;
+}
+.zcp-rail-btn:hover {
+    background: var(--zc-assistant-bg, #f0f0f1);
+    border-color: var(--zc-accent, #2271b1);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    transform: translateX(2px);
+}
+.zcp-rail-btn:active { transform: translateX(2px) translateY(1px); }
+.zcp-rail-btn-icon {
+    font-size: 1.375em;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.zcp-rail-btn-label {
+    font-size: 1.125em;
+    font-weight: 600;
+    color: var(--zc-text-strong, #1d2327);
+}
+.zcp-rail-btn-prefix {
+    font-weight: 400;
+    /* Sized against parent .zcp-rail-btn-label (1.125em), so 0.889em
+       restores the original 16/18 ratio (16px prefix / 18px label). */
+    font-size: 0.889em;
+    color: var(--zc-text-muted, #646970);
+}
+
+/* =====================================================================
+   Mobile floating menu trigger + modal
+   Hidden by default; shown only on small viewports.
+   ===================================================================== */
+.zcp-mobile-trigger {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 60;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    background: var(--zc-surface, #ffffff);
+    border: 1px solid var(--zc-border, #c3c4c7);
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: transform .12s, box-shadow .15s;
+}
+.zcp-mobile-trigger:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.14); }
+.zcp-mobile-trigger:active { transform: translateY(1px); }
+.zcp-mobile-trigger img {
+    width: 30px; height: 30px; display: block;
+}
+
+.zcp-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    background: rgba(20, 22, 30, 0.55);
+    padding: 64px 16px 24px;
+    overflow-y: auto;
+    -webkit-tap-highlight-color: transparent;
+}
+.zcp-modal[hidden] { display: none; }
+.zcp-modal-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--zc-surface, #ffffff);
+    border-radius: 14px;
+    padding: 18px 18px 22px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.20);
+    position: relative;
+}
+.zcp-modal-title {
+    font-size: 1.25em;
+    font-weight: 600;
+    margin: 4px 0 14px;
+    color: var(--zc-text-strong, #1d2327);
+    padding-right: 36px;
+}
+.zcp-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 0;
+    background: transparent;
+    color: var(--zc-text-muted, #646970);
+    font-size: 1.625em;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color .12s, color .12s;
+}
+.zcp-modal-close:hover { background: var(--zc-assistant-bg, #f0f0f1); color: var(--zc-text-strong, #1d2327); }
+.zcp-modal-list { display: flex; flex-direction: column; gap: 12px; }
+.zcp-modal-list .zcp-rail-btn { width: 100%; }
+.zcp-modal-list .zcp-team-card { box-shadow: none; border: 1px solid var(--zc-border, #c3c4c7); }
+
+/* ----- Breakpoint: switch from desktop rail to mobile trigger ----- */
+@media (max-width: 899px) {
+    .zcp-rail { display: none; }
+    .zcp-mobile-trigger { display: flex; }
+    .zcp-main { padding: 80px 16px 24px; }
+    /* Body font-size override removed in 2.34.10 — picker now drives
+       both desktop and mobile via the inline body rule above. */
+}

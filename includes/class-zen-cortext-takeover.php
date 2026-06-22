@@ -332,14 +332,21 @@ class Zen_Cortext_Takeover {
         if ($manual === '' || $manual === false) $manual = 'offline';
         if ($manual === 'offline') return 'offline';
 
-        // Auto-schedule: outside the configured hours/days, force offline
-        // regardless of manual status or heartbeat. Inside hours, normal logic.
-        if (!self::is_within_schedule($user_id)) return 'offline';
-
         $last_seen = (int) get_user_meta($user_id, self::META_LAST_SEEN, true);
         if ($last_seen === 0) return 'offline';
 
         $age = time() - $last_seen;
+
+        // Availability schedule: outside the configured hours/days we force
+        // offline — but ONLY when the admin is not actively present. An admin
+        // who is manually online/away AND still heartbeating (fresh last_seen)
+        // has explicitly signalled "I am here right now", so that wins over the
+        // calendar. The schedule resumes the moment they go idle / close the
+        // app (heartbeat older than AWAY_TIMEOUT), which is its real purpose:
+        // not advertising availability when nobody is actually watching.
+        if (!self::is_within_schedule($user_id) && $age > self::AWAY_TIMEOUT) {
+            return 'offline';
+        }
 
         if ($age > self::OFFLINE_TIMEOUT) {
             if ($age > self::REACHABLE_MAX) return 'offline';

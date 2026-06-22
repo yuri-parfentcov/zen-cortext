@@ -21,7 +21,6 @@ if (!defined('ABSPATH')) {
 class Zen_Cortext_Author_Bio {
 
     private static $instance = null;
-    private static $assets_printed = false;
 
     public static function get_instance() {
         if (null === self::$instance) {
@@ -31,10 +30,45 @@ class Zen_Cortext_Author_Bio {
     }
 
     private function __construct() {
+        // Canonical, fully-prefixed shortcode tags.
+        add_shortcode('zen_cortext_author_bio',           array(__CLASS__, 'shortcode_bio'));
+        add_shortcode('zen_cortext_author_posts_heading', array(__CLASS__, 'shortcode_heading'));
+        // Deprecated back-compat aliases (these slugs were inherited from the
+        // standalone zen-author-bio mu-plugin this feature absorbed). Kept so
+        // existing author templates/content using [zen_author_bio] keep
+        // working; new installs should use the zen_cortext_* tags above.
         add_shortcode('zen_author_bio',           array(__CLASS__, 'shortcode_bio'));
         add_shortcode('zen_author_posts_heading', array(__CLASS__, 'shortcode_heading'));
         add_filter('the_content',                  array(__CLASS__, 'filter_content'), 20);
-        add_action('wp_footer',                    array(__CLASS__, 'print_footer_styles'));
+        // Author-bio + inline post-author card styles/JS go through the
+        // enqueue pipeline (author-bio.css / author-bio.js) instead of
+        // inline <style>/<script> blocks.
+        add_action('wp_enqueue_scripts',           array(__CLASS__, 'register_assets'));
+    }
+
+    /**
+     * Register and (where relevant) enqueue the author-bio assets. The
+     * inline post-author card can appear on any single post, and the
+     * [zen_author_bio] card appears on author archives — enqueue on both.
+     */
+    public static function register_assets() {
+        wp_register_style(
+            'zen-cortext-author-bio',
+            ZEN_CORTEXT_PLUGIN_URL . 'public/assets/author-bio.css',
+            array(),
+            ZEN_CORTEXT_VERSION
+        );
+        wp_register_script(
+            'zen-cortext-author-bio',
+            ZEN_CORTEXT_PLUGIN_URL . 'public/assets/author-bio.js',
+            array(),
+            ZEN_CORTEXT_VERSION,
+            true
+        );
+        if (is_singular('post') || is_author()) {
+            wp_enqueue_style('zen-cortext-author-bio');
+            wp_enqueue_script('zen-cortext-author-bio');
+        }
     }
 
     /**
@@ -145,70 +179,12 @@ class Zen_Cortext_Author_Bio {
             <?php endif; ?>
         </div>
         <?php
-        self::print_bio_inline_assets();
+        // Ensure the card's styles/JS are present even if the shortcode is
+        // dropped somewhere register_assets() didn't pre-enqueue. Enqueuing
+        // is idempotent; late calls print in the footer.
+        wp_enqueue_style('zen-cortext-author-bio');
+        wp_enqueue_script('zen-cortext-author-bio');
         return ob_get_clean();
-    }
-
-    /**
-     * Inline CSS + JS (printed once per request). Guard variable is a
-     * static class member rather than the mu-plugin's function-scope
-     * `static $printed` so an autoloader / opcache reset can't drift.
-     */
-    public static function print_bio_inline_assets() {
-        if (self::$assets_printed) {
-            return;
-        }
-        self::$assets_printed = true;
-        ?>
-        <style>
-        .zen-ab{display:flex;gap:36px;align-items:stretch;padding:32px;margin-bottom:40px;background:#f9f9f9;border-radius:12px}
-        .zen-ab-left{flex:0 0 220px;display:flex;flex-direction:column;align-items:center;text-align:center}
-        .zen-ab-avatar{margin-bottom:14px}
-        .zen-ab-avatar-img,.zen-ab-avatar img{width:180px;height:180px;border-radius:50%;object-fit:cover;display:block}
-        .zen-ab-name{margin:0 0 6px;font-size:1.25em;line-height:1.3}
-        .zen-ab-role{margin:0 0 16px;font-size:.9em;color:#666;line-height:1.35}
-        .zen-ab-contacts{display:flex;flex-direction:column;gap:8px;width:100%}
-        .zen-ab-contact{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 12px;border-radius:6px;font-size:.84em;text-decoration:none;transition:background .2s,color .2s;position:relative;cursor:pointer;line-height:1;white-space:nowrap}
-        .zen-ab-email{background:#f0f0f0;color:#333}
-        .zen-ab-email:hover{background:#e2e2e2;color:#111}
-        .zen-ab-wa{background:#25d366;color:#fff}
-        .zen-ab-wa:hover{background:#1fb855;color:#fff}
-        .zen-ab-li{background:#0A66C2;color:#fff}
-        .zen-ab-li:hover{background:#004182;color:#fff}
-        .zen-ab-contact svg{flex-shrink:0}
-        .zen-ab-toast{position:absolute;top:-30px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:4px 10px;border-radius:4px;font-size:.78em;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .25s}
-        .zen-ab-toast.zen-ab-show{opacity:1}
-        .zen-ab-right{flex:1;min-width:0;line-height:1.7;color:#444;border-left:1px solid #e0e0e0;padding-left:36px}
-        .zen-ab-right p:first-child{margin-top:0}
-        .zen-ab-right p:last-child{margin-bottom:0}
-        @media(max-width:768px){
-            .zen-ab{flex-direction:column;align-items:center;text-align:center;padding:24px 18px;gap:24px}
-            .zen-ab-left{flex:none;width:100%}
-            .zen-ab-right{border-left:none;padding-left:0;border-top:1px solid #e0e0e0;padding-top:20px;text-align:left}
-            .zen-ab-contacts{flex-direction:row;flex-wrap:wrap;justify-content:center}
-        }
-        </style>
-        <script>
-        (function(){
-            document.addEventListener('click',function(e){
-                var el=e.target.closest('.zen-ab-email');
-                if(!el)return;
-                var email=el.getAttribute('data-email');
-                if(!email)return;
-                if(navigator.clipboard&&navigator.clipboard.writeText){
-                    e.preventDefault();
-                    navigator.clipboard.writeText(email).then(function(){showToast(el)});
-                }
-            });
-            function showToast(el){
-                var t=el.querySelector('.zen-ab-toast');
-                if(!t)return;
-                t.classList.add('zen-ab-show');
-                setTimeout(function(){t.classList.remove('zen-ab-show')},1500);
-            }
-        })();
-        </script>
-        <?php
     }
 
     /**
@@ -274,25 +250,4 @@ class Zen_Cortext_Author_Bio {
         return $content;
     }
 
-    /**
-     * Inline footer CSS for the inline-post-author card. Only emits on
-     * single-post requests where the filter_content() replacement could
-     * have run.
-     */
-    public static function print_footer_styles() {
-        if (!is_singular('post')) {
-            return;
-        }
-        ?>
-        <style>
-        .zen-post-author{display:inline-flex;align-items:center;gap:10px}
-        .zen-post-author-avatar,.zen-post-author img.zen-post-author-avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;display:block;flex-shrink:0}
-        .zen-post-author-info{display:flex;flex-direction:column;gap:1px;line-height:1.3}
-        .zen-post-author-label{font-size:.75em;color:#888;text-transform:uppercase;letter-spacing:.5px}
-        .zen-post-author-role{font-size:.8em;color:#666;margin-top:1px}
-        .zen-post-author a{text-decoration:none;font-weight:500}
-        .zen-post-author a:hover{text-decoration:underline}
-        </style>
-        <?php
-    }
 }

@@ -309,6 +309,8 @@
 
             var requestBody = { messages: messages };
             if (currentChatUid) requestBody.chat_uid = currentChatUid;
+            var modelSel = document.getElementById('zcb-model');
+            if (modelSel && modelSel.value) requestBody.model = modelSel.value;
 
             fetch(restUrl, {
                 method: 'POST',

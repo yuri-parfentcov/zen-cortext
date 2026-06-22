@@ -7,15 +7,18 @@
 /*
  * phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
  * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery.SchemaChange
  * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
  *
- * Justification: this file is a data-access layer for plugin-owned tables
- * (wp_zen_cortext_*). Each query is built around a $wpdb->prefix . 'zen_cortext_…'
- * table name, which cannot be passed via a %s placeholder ($wpdb->prepare does
- * not bind identifiers). Every user-controlled value in WHERE / VALUES /
- * SET clauses goes through $wpdb->prepare(). Admin analytics aggregates
- * (SUM / COUNT / CASE over plugin-owned tables) are real-time and not
- * candidates for the WP_Object_Cache.
+ * Justification: this file owns the plugin's custom tables (wp_zen_cortext_*).
+ * Each query interpolates ONLY a $wpdb->prefix . 'zen_cortext_…' table name,
+ * which cannot be passed via a %s placeholder ($wpdb->prepare does not bind
+ * identifiers); every user-controlled value in WHERE / VALUES / SET clauses
+ * goes through $wpdb->prepare(). On activation/upgrade the file runs the
+ * schema (dbDelta CREATE TABLE plus a few idempotent ALTER TABLE migrations
+ * that add columns/indexes to plugin-owned tables) — hence the SchemaChange
+ * allowance. These are install/upgrade-time operations, not request-path
+ * queries, and take no user input.
  */
 
 if (!defined('ABSPATH')) {
@@ -185,12 +188,12 @@ class Zen_Cortext {
             if ($existing === '') {
                 $had_yanone = false;
                 if (class_exists('Zen_Cortext_Template_Renderer')) {
-                    $live_css = Zen_Cortext_Template_Renderer::writable_root() . 'assets/chat.css';
-                    if (file_exists($live_css)) {
-                        $contents = @file_get_contents($live_css);
-                        if (is_string($contents) && stripos($contents, 'Yanone Kaffeesatz') !== false) {
-                            $had_yanone = true;
-                        }
+                    // The editable chat.css now lives in the DB (after the
+                    // file→DB migration in ensure_seeded above). Sniff the
+                    // saved source for the legacy Yanone font name.
+                    $contents = Zen_Cortext_Template_Renderer::get_live_source('chat.css');
+                    if (is_string($contents) && stripos($contents, 'Yanone Kaffeesatz') !== false) {
+                        $had_yanone = true;
                     }
                 }
                 if ($had_yanone) {
@@ -198,6 +201,41 @@ class Zen_Cortext {
                 }
             }
             update_option('zen_cortext_font_migrated_v2_34_5', 'done', false);
+        }
+
+        // One-time GTM → custom-code migration. Earlier builds hardcoded a
+        // Google Tag Manager snippet on the standalone chat page, reading the
+        // container id from a theme option (`ezbreezy_gtm_id`) or the GTM4WP
+        // plugin. That was theme-coupled and GTM-only; it is now replaced by
+        // the generic Header/Body/Footer custom-code fields. To preserve an
+        // existing author's tracking, seed those fields from the legacy GTM id
+        // if one is resolvable and the new Header field hasn't been set yet.
+        if (get_option('zen_cortext_gtm_code_migrated', '') !== 'done') {
+            if (trim((string) get_option('zen_cortext_header_code', '')) === '') {
+                $gtm_id = trim((string) get_option('ezbreezy_gtm_id', ''));
+                if ($gtm_id === '') {
+                    $gtm4wp = get_option('gtm4wp-options');
+                    if (is_array($gtm4wp) && !empty($gtm4wp['gtm-code'])) {
+                        $gtm_id = trim((string) $gtm4wp['gtm-code']);
+                    }
+                }
+                if (preg_match('/^GTM-[A-Z0-9]+$/', $gtm_id)) {
+                    $header = "<!-- Google Tag Manager -->\n<script>(function(w,d,s,l,i){w[l]=w[l]||[];"
+                        . "w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});"
+                        . "var f=d.getElementsByTagName(s)[0],j=d.createElement(s),"
+                        . "dl=l!='dataLayer'?'&l='+l:'';j.async=true;"
+                        . "j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;"
+                        . "f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','"
+                        . $gtm_id . "');</script>\n<!-- End Google Tag Manager -->";
+                    $body = "<!-- Google Tag Manager (noscript) -->\n"
+                        . '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=' . $gtm_id . '"'
+                        . ' height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>' . "\n"
+                        . "<!-- End Google Tag Manager (noscript) -->";
+                    update_option('zen_cortext_header_code', $header, false);
+                    update_option('zen_cortext_body_code', $body, false);
+                }
+            }
+            update_option('zen_cortext_gtm_code_migrated', 'done', false);
         }
 
         // Rewrite rule to serve the livechat service worker from root scope.
@@ -527,18 +565,51 @@ class Zen_Cortext {
         $ads_table = $wpdb->prefix . 'zen_cortext_ads_campaigns';
         $ads_sql = "CREATE TABLE {$ads_table} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            type VARCHAR(16) NOT NULL DEFAULT 'campaign',
             campaign_id VARCHAR(32) NOT NULL,
             campaign_name VARCHAR(191) NOT NULL,
+            ad_group_id VARCHAR(32) NOT NULL DEFAULT '',
+            ad_group_name VARCHAR(191) NOT NULL DEFAULT '',
             status VARCHAR(16) NOT NULL DEFAULT '',
             budget_micros BIGINT DEFAULT NULL,
             top_headlines TEXT NOT NULL,
             top_keywords TEXT NOT NULL,
             synced_at DATETIME NOT NULL,
             PRIMARY KEY  (id),
-            UNIQUE KEY campaign_id (campaign_id),
+            UNIQUE KEY entity (type, campaign_id, ad_group_id),
             KEY campaign_name (campaign_name)
         ) {$charset_collate};";
         dbDelta($ads_sql);
+        // dbDelta is unreliable at ADDing columns to an existing table on some
+        // MySQL/MariaDB setups, so add the ad-group columns explicitly here
+        // (idempotent) before touching the indexes that reference them.
+        $ads_cols = $wpdb->get_col("DESC {$ads_table}", 0);
+        if (!in_array('type', $ads_cols, true)) {
+            $wpdb->query("ALTER TABLE {$ads_table} ADD COLUMN type VARCHAR(16) NOT NULL DEFAULT 'campaign' AFTER id");
+        }
+        if (!in_array('ad_group_id', $ads_cols, true)) {
+            $wpdb->query("ALTER TABLE {$ads_table} ADD COLUMN ad_group_id VARCHAR(32) NOT NULL DEFAULT '' AFTER campaign_name");
+        }
+        if (!in_array('ad_group_name', $ads_cols, true)) {
+            $wpdb->query("ALTER TABLE {$ads_table} ADD COLUMN ad_group_name VARCHAR(191) NOT NULL DEFAULT '' AFTER ad_group_id");
+        }
+        // Migration: the ads table's UNIQUE key moved from (campaign_id) to
+        // (type, campaign_id, ad_group_id) when ad-group rows were added (a
+        // campaign_id now repeats across its ad groups). dbDelta cannot drop an
+        // existing index, so remove the legacy one explicitly when present, and
+        // make sure the composite key exists.
+        $ads_legacy_idx = $wpdb->get_results($wpdb->prepare(
+            "SHOW INDEX FROM {$ads_table} WHERE Key_name = %s", 'campaign_id'
+        ));
+        if (!empty($ads_legacy_idx)) {
+            $wpdb->query("ALTER TABLE {$ads_table} DROP INDEX campaign_id");
+        }
+        $ads_entity_idx = $wpdb->get_results($wpdb->prepare(
+            "SHOW INDEX FROM {$ads_table} WHERE Key_name = %s", 'entity'
+        ));
+        if (empty($ads_entity_idx)) {
+            $wpdb->query("ALTER TABLE {$ads_table} ADD UNIQUE KEY entity (type, campaign_id, ad_group_id)");
+        }
 
         // Multi-key API authentication for the external read API (zc/v1
         // namespace). Each row is one labeled key with scoped read

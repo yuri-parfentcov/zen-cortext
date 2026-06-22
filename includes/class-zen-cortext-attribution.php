@@ -177,8 +177,15 @@ class Zen_Cortext_Attribution {
             $keywords  = self::decode_string_list($ads['top_keywords']  ?? '');
             $lines[] = "";
             $lines[] = "CAMPAIGN METADATA (from Google Ads):";
-            $lines[] = "Campaign: " . (string) $ads['campaign_name']
-                     . " (id " . (string) $ads['campaign_id'] . ")";
+            if (isset($ads['type']) && $ads['type'] === 'group') {
+                $lines[] = "Ad group: " . (string) $ads['ad_group_name']
+                         . " (id " . (string) $ads['ad_group_id'] . ")"
+                         . " — Campaign: " . (string) $ads['campaign_name']
+                         . " (id " . (string) $ads['campaign_id'] . ")";
+            } else {
+                $lines[] = "Campaign: " . (string) $ads['campaign_name']
+                         . " (id " . (string) $ads['campaign_id'] . ")";
+            }
             if ($headlines) {
                 $lines[] = "Top headlines shown to this visitor:";
                 foreach (array_slice($headlines, 0, 8) as $h) {

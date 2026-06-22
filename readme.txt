@@ -4,7 +4,7 @@ Tags: chatbot, ai chat, lead generation, knowledge base, customer support
 Requires at least: 5.9
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.35.0
+Stable tag: 2.39.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,8 +65,8 @@ For you (the admin):
 = Bundled shortcodes =
 
 * `[zen_cortext]` — embed the chat anywhere.
-* `[zen_author_bio]` — display the author bio card (absorbed from the deprecated zen-author-bio mu-plugin).
-* `[zen_author_posts_heading]` — display an "Author: [name]" heading.
+* `[zen_cortext_author_bio]` — display the author bio card (absorbed from the deprecated zen-author-bio mu-plugin; the legacy tag `[zen_author_bio]` still works as a deprecated alias).
+* `[zen_cortext_author_posts_heading]` — display an "Author: [name]" heading (legacy alias: `[zen_author_posts_heading]`).
 
 = Non-affiliation =
 
@@ -107,6 +107,10 @@ Voice is a mobile-only feature (where typing is most painful). Check that **Enab
 = How do I know if my Knowledge Base is up to date? =
 
 The Knowledge Base admin badge shows a count of pending items needing classification or restructuring. Click **Rebuild KB** to process them. New and edited posts get queued automatically.
+
+= Can the plugin run AI jobs through a local Claude binary instead of the API? =
+
+This plugin itself always uses the Anthropic HTTP API and never executes system commands. Running internal admin jobs (knowledge-base classify/restructure, Brainstorm, the artifact builder, the Template Editor AI) through a locally-installed, authenticated Claude Code CLI is available as a separate optional add-on plugin ("Zen Cortext — Claude Code CLI Processor") distributed outside the WordPress.org directory, because it shells out to the binary. When that add-on is installed and active it transparently takes over those internal jobs via documented filter hooks; the visitor-facing chat always uses the HTTP API regardless (the CLI cannot stream into the browser).
 
 = Can I use this without sending data to any third party? =
 
@@ -156,6 +160,10 @@ This plugin connects to external AI and analytics services to do its job. By usi
 
 When admin push notifications are enabled, web-push messages are sent through the visitor's browser-vendor push service (FCM for Chrome, Mozilla autopush for Firefox, Apple push for Safari). These services are governed by the browser vendor's terms.
 
+= Custom code fields (optional — your own tracking) =
+
+The Settings → Tracking tab provides Header / Body / Footer code fields that are output verbatim on the standalone chat pages. The plugin itself makes no call to any third party here — it only prints whatever code you enter. If you paste third-party tags (for example Google Tag Manager, Google Analytics, or the Meta Pixel), those tags will load on the chat page and connect to their respective services according to your own configuration and their terms.
+
 == Screenshots ==
 
 1. The visitor-facing AI chat in action — streaming response, intro card, follow-up chips.
@@ -166,15 +174,93 @@ When admin push notifications are enabled, web-push messages are sent through th
 
 == Changelog ==
 
-= 2.35.0 =
+= 2.39.13 =
+* Custom code for the chat pages: the full-page chat (/talk/) renders its own document and bypasses the theme, so analytics/scripts added via your theme or a header-footer plugin did not load there. Settings → Tracking now has Header, Body, and Footer code fields that inject your own code (Google Tag Manager, GA4, Meta Pixel, site-verification meta tags, etc.) directly into the chat page. This replaces an earlier theme-specific Google Tag Manager hook; existing tag-manager setups are migrated into the Header/Body fields automatically. The fields are stored raw only for users with the unfiltered_html capability (administrators); other roles' input is filtered through wp_kses_post().
+
+= 2.39.12 =
+* PHP 8.2 compatibility: declared the admin class's $init_hook property so it no longer triggers a "Creation of dynamic property" deprecation under WP_DEBUG. Verified the plugin passes WordPress Plugin Check with zero errors and zero warnings.
+
+= 2.39.11 =
+* Fixed a regression from the HTTP-API streaming change (2.39.0): a successful visitor chat could still be reported as a transport error ("Missing header/body separator") and trigger a false "service unavailable" message + admin alert email. The streaming read callback consumes the response body, so the WP HTTP API's Requests layer has nothing left to re-parse and returns a WP_Error even on success — that is now ignored when the stream actually delivered. Genuine failures (no data streamed, HTTP 4xx/5xx, empty responses) are still detected and reported.
+
+= 2.39.10 =
+* Database-safety review. Confirmed every query that takes user input binds it through $wpdb->prepare() with placeholders; the only thing interpolated into a query is the plugin's own table name (built from $wpdb->prefix, which prepare() cannot parameterize). Documented the schema-migration ALTER TABLE statements and added targeted phpcs justifications for the install/upgrade schema changes, the one-time uploads-cleanup rmdir, and the set_time_limit() used by the SSE chat stream. The plugin now passes WordPress Plugin Check with zero errors.
+
+= 2.39.9 =
+* Unique-prefix cleanup. Renamed the few transient cache keys that used short prefixes (zc_, zci_, zce_) to the plugin's full zen_cortext_ prefix. Added fully-prefixed shortcode tags [zen_cortext_author_bio] and [zen_cortext_author_posts_heading]; the legacy [zen_author_bio] / [zen_author_posts_heading] tags continue to work as deprecated aliases. All options, transients, classes, hooks and constants now consistently use the zen_cortext / Zen_Cortext / ZEN_CORTEXT prefix.
+
+= 2.39.8 =
+* Output-escaping audit. The two flagged cases were already resolved by the earlier enqueue refactor (the REST URL is now passed to JavaScript via wp_localize_script, and the chat font-family is sanitized for CSS context). The full-page chat body is emitted by a template engine that escapes every dynamic placeholder (esc_html / esc_url / esc_attr) with only pre-escaped HTML passed through raw — documented inline, since wp_kses_post() would strip its SVG icons and Alpine.js attributes.
+
+= 2.39.7 =
+* Hardened input sanitization on several admin AJAX handlers and server variables. The User-Agent header and client IP ($_SERVER) are now run through sanitize_text_field(); the attribution context/invite text, survey description/script/outcome fields, and the Knowledge Artifact source are sanitized on input (validating UTF-8 and stripping control characters, while preserving the technical content those fields legitimately hold); and the decoded synthesize-from-chat transcript is sanitized after json_decode().
+
+= 2.39.6 =
+* Settings → Connection now shows an at-a-glance "Backend for internal AI jobs" status line (green dot + "Claude Code CLI" when the optional CLI add-on is active, blue dot + "Anthropic HTTP API" otherwise).
+
+= 2.39.5 =
+* Removed the optional local Claude Code CLI processor (and all proc_open / shell-execution code) from the plugin. The plugin now uses the Anthropic HTTP API exclusively. Internal admin AI jobs (KB classify/restructure, Brainstorm, artifact builder, Template Editor AI) run through new pluggable filter hooks (zen_cortext_complete_text, zen_cortext_stream_internal, zen_cortext_test_connection). The CLI backend now ships as a separate optional add-on plugin that implements those hooks — keeping this plugin free of system-command execution per WordPress.org guidelines.
+
+= 2.39.4 =
+* Hardened the public chat status/poll REST endpoints. The /chat/{uid}/status and /chat/{uid}/poll routes now require the per-chat owner token (the same credential already used by send/invite/delete) instead of being fully public, so only the originating visitor can read their own conversation's live takeover state and events. The chat widget passes the token automatically; legacy conversations with no stored token remain accessible for backward compatibility.
+
+= 2.39.3 =
+* Hardened the sanitize callbacks on register_setting() fields. The welcome message is now sanitized with sanitize_textarea_field(); the intro-card body (rendered as HTML) with wp_kses_post(); and the AI prompt/template fields (system prompt, classify prompt, survey template) with a sanitizer that validates UTF-8 and strips control characters while preserving the angle-bracket template tokens those prompts depend on.
+
+= 2.39.2 =
+* The Template Editor (editable chat templates + chat.css + version history) now stores its data in the WordPress database instead of writing source files to wp-content/uploads/. Factory defaults still ship read-only inside the plugin. A one-time migration imports any existing edited copies from uploads into the database and removes the old files, so no editable source is kept on disk (where it would be publicly readable and lost on upgrade). When the chat stylesheet hasn't been customized it loads as the cacheable bundled file; a customized stylesheet is printed as inline CSS.
+
+= 2.39.1 =
+* Fixed the "Talk to a real person" availability status: an admin who is manually online/away and actively present (live heartbeat) now shows as available to visitors even outside their configured availability-schedule window. The schedule still forces offline once the admin goes idle or closes the live-chat app — so it no longer hides someone who is genuinely online right now (e.g. working a weekend that falls outside their Mon–Fri schedule).
+
+= 2.39.0 =
+* All CSS and JavaScript is now loaded through the WordPress enqueue API (wp_enqueue_style / wp_enqueue_script / wp_register_* / wp_add_inline_style / wp_add_inline_script / wp_localize_script). Every hand-written <style>, <script>, and stylesheet <link> tag has been removed from the templates, admin views, and helper classes.
+* The standalone full-page chat and live-chat (PWA) templates now register the plugin's own assets and print only those handles, so they go through the core pipeline while still keeping theme / other-plugin assets off the page.
+* Removed the bundled Yanone Kaffeesatz Google Fonts request entirely — the plugin no longer makes any external font request. Fonts remain fully configurable in the Design tab; the chosen font-family / size is emitted as enqueued inline CSS.
+* REST and asset URLs now use the portable WordPress location helpers (rest_url(), plugins_url()) instead of hardcoded /wp-json or site-root paths, so they work on any install (custom REST prefixes, subdirectory installs, etc.).
+* The chat icons (mobile chat trigger, PWA touch icon, browser/push notification icons) are bundled with the plugin and driven by the Design → float-button icon setting — no hardcoded references.
+* The Anthropic chat requests now go through the WordPress HTTP API (wp_remote_post); the Server-Sent Events body is streamed chunk-by-chunk by attaching the read callbacks via the core http_api_curl action, replacing the direct curl_init/curl_exec calls.
+* No functional changes to the chat, admin tools, float button, or author-bio card — this is a WordPress.org compliance pass (asset loading, location helpers, HTTP API).
+
+= 2.38.0 =
 * First public release on wordpress.org.
 * Full readme.txt + external services disclosure.
 * Consolidated version constants and metadata for the WordPress Plugin Directory submission.
+* The Yanone Kaffeesatz webfont is now requested from Google Fonts only when the Design → Base font setting asks for it; the default install makes no external font request.
+* The optional local Claude Code CLI processor (which shells out to the `claude` binary) is now OFF by default and can only be enabled by defining the `ZEN_CORTEXT_ENABLE_CLI` constant in wp-config.php. Without it the plugin always uses the Anthropic HTTP API and never invokes proc_open().
+* Visitor write endpoints (delete / lead / email / invite) now declare their owner-token authorization in the REST permission_callback at route registration.
 
 = 2.34.x (development / internal) =
 * See the project's GitHub repository commit history for the full pre-1.0 development log.
 
 == Upgrade Notice ==
 
-= 2.35.0 =
+= 2.39.11 =
+Fixes false "service unavailable" messages and admin alert emails that could fire after a successful visitor chat. Recommended update.
+
+= 2.39.9 =
+Internal cache keys and shortcode tags now use the full zen_cortext_ prefix. The old [zen_author_bio] / [zen_author_posts_heading] shortcodes still work as aliases, so no action is required.
+
+= 2.39.7 =
+Stronger input sanitization on admin handlers and server variables. No action required.
+
+= 2.39.5 =
+The plugin no longer executes system commands; the optional Claude Code CLI backend moved to a separate add-on plugin. If you used it, install the "Zen Cortext — Claude Code CLI Processor" add-on; otherwise no action is needed.
+
+= 2.39.4 =
+The live-chat status/poll endpoints are now gated by the per-chat owner token. No action required.
+
+= 2.39.3 =
+Stronger input sanitization on the settings fields. No action required.
+
+= 2.39.2 =
+Template Editor data (templates, chat.css, version history) moves from uploads files into the database. Existing edits are migrated automatically on upgrade.
+
+= 2.39.1 =
+Fixes the live-chat availability status so an actively-online admin is no longer hidden as offline outside their schedule window.
+
+= 2.39.0 =
+Assets are now loaded via the WordPress enqueue API and the bundled Google Fonts request was removed. No data migration required.
+
+= 2.38.0 =
 First wordpress.org release. No data migration required.

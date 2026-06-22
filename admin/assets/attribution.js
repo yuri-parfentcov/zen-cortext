@@ -54,6 +54,14 @@
             openEditor(parseInt($(this).data('id'), 10));
         });
 
+        $list.on('click', '.zat-copy', function () {
+            copyRule(parseInt($(this).data('id'), 10));
+        });
+
+        $list.on('click', '.zat-delete-row', function () {
+            deleteRuleById(parseInt($(this).data('id'), 10), $(this).data('label') || '');
+        });
+
         // Picker: select a synced GAds campaign → fill the input + show preview.
         // Picker option values are exactly what should land in the input —
         // either a campaign name or a campaign ID, depending on which
@@ -120,7 +128,11 @@
                      + '<td>' + (parseInt(r.priority, 10) || 0) + '</td>'
                      + '<td>' + (parseInt(r.enabled, 10) ? '✓' : '—') + '</td>'
                      + '<td>' + escapeHtml(r.updated_at || '') + '</td>'
-                     + '<td><button type="button" class="button button-small zat-edit" data-id="' + parseInt(r.id, 10) + '">Edit</button></td>'
+                     + '<td>'
+                     +     '<button type="button" class="button button-small zat-edit" data-id="' + parseInt(r.id, 10) + '">Edit</button> '
+                     +     '<button type="button" class="button button-small zat-copy" data-id="' + parseInt(r.id, 10) + '">Copy</button> '
+                     +     '<button type="button" class="button button-small button-link-delete zat-delete-row" data-id="' + parseInt(r.id, 10) + '" data-label="' + escapeHtml(r.label || '') + '">Delete</button>'
+                     + '</td>'
                      + '</tr>';
             });
             $list.html(html);
@@ -207,24 +219,42 @@
                     var byName = {}, byId = {};
                     var $picker = $('#zat-synced-picker');
                     $picker.find('option:not(:first)').remove();
-                    var $byNameGroup = $('<optgroup label="By campaign name"/>');
-                    var $byIdGroup   = $('<optgroup label="By campaign ID"/>');
+                    var $cName = $('<optgroup label="Campaigns — by name"/>');
+                    var $cId   = $('<optgroup label="Campaigns — by ID"/>');
+                    var $gName = $('<optgroup label="Ad groups — by name"/>');
+                    var $gId   = $('<optgroup label="Ad groups — by ID"/>');
 
                     rows.forEach(function (r) {
-                        var name = r.campaign_name || '';
-                        var id   = r.campaign_id || '';
                         var counts = ' (' + countList(r.top_headlines) + ' h, ' + countList(r.top_keywords) + ' k)';
-                        if (name) {
-                            byName[name.toLowerCase()] = r;
-                            $byNameGroup.append($('<option/>').val(name).text(name + counts));
-                        }
-                        if (id) {
-                            byId[String(id)] = r;
-                            $byIdGroup.append($('<option/>').val(String(id)).text(id + ' — ' + name));
+                        if (r.type === 'group') {
+                            var gname = r.ad_group_name || '';
+                            var gid   = r.ad_group_id || '';
+                            var label = (r.campaign_name || '') + ' › ' + gname;
+                            if (gname) {
+                                byName[gname.toLowerCase()] = r; // group wins on tie
+                                $gName.append($('<option/>').val(gname).text(label + counts));
+                            }
+                            if (gid) {
+                                byId[String(gid)] = r;
+                                $gId.append($('<option/>').val(String(gid)).text(gid + ' — ' + label));
+                            }
+                        } else {
+                            var name = r.campaign_name || '';
+                            var id   = r.campaign_id || '';
+                            if (name) {
+                                if (!byName[name.toLowerCase()]) byName[name.toLowerCase()] = r;
+                                $cName.append($('<option/>').val(name).text(name + counts));
+                            }
+                            if (id) {
+                                if (!byId[String(id)]) byId[String(id)] = r;
+                                $cId.append($('<option/>').val(String(id)).text(id + ' — ' + name));
+                            }
                         }
                     });
-                    if ($byNameGroup.children().length) $picker.append($byNameGroup);
-                    if ($byIdGroup.children().length)   $picker.append($byIdGroup);
+                    if ($cName.children().length) $picker.append($cName);
+                    if ($cId.children().length)   $picker.append($cId);
+                    if ($gName.children().length) $picker.append($gName);
+                    if ($gId.children().length)   $picker.append($gId);
 
                     syncedByName = byName;
                     syncedById   = byId;
@@ -277,7 +307,13 @@
         function showSyncedPreviewFor(value) {
             var row = lookupSynced(value);
             if (!row) { hideSyncedPreview(); return; }
-            $('#zat-synced-preview-name').text(row.campaign_name + ' (id ' + row.campaign_id + ')');
+            var label;
+            if (row.type === 'group') {
+                label = 'ad group "' + row.ad_group_name + '" (id ' + row.ad_group_id + ') · campaign "' + row.campaign_name + '"';
+            } else {
+                label = 'campaign "' + row.campaign_name + '" (id ' + row.campaign_id + ')';
+            }
+            $('#zat-synced-preview-name').text(label);
             var headlines = parseList(row.top_headlines);
             var keywords  = parseList(row.top_keywords);
             $('#zat-synced-headlines-count').text(headlines.length ? '(' + headlines.length + ')' : '');
@@ -303,7 +339,11 @@
             var headlines = parseList(row.top_headlines);
             var keywords  = parseList(row.top_keywords);
             var lines = [];
-            lines.push('Visitors come from Google Ads campaign "' + row.campaign_name + '" (id ' + row.campaign_id + ').');
+            if (row.type === 'group') {
+                lines.push('Visitors come from Google Ads ad group "' + row.ad_group_name + '" (id ' + row.ad_group_id + ') in campaign "' + row.campaign_name + '".');
+            } else {
+                lines.push('Visitors come from Google Ads campaign "' + row.campaign_name + '" (id ' + row.campaign_id + ').');
+            }
             if (headlines.length) {
                 lines.push('');
                 lines.push('They were shown ad headlines including:');
@@ -319,7 +359,14 @@
             var summary = lines.join('\n');
             var $ctx = $('#zat-context');
             var current = ($ctx.val() || '').trim();
-            $ctx.val(current ? (summary + '\n\n' + current) : summary);
+            // Replace, don't prepend — seeding a starter should produce a clean
+            // block, not stack on top of a previously-seeded one. Guard a
+            // non-empty box with a confirm so hand-written context isn't lost.
+            if (current && !window.confirm('Replace the current Context with this generated summary? Your existing text will be overwritten.')) {
+                $('#zat-synced-insert-status').text('Cancelled — Context left unchanged').removeClass('success').addClass('error');
+                return;
+            }
+            $ctx.val(summary);
             $('#zat-synced-insert-status').text('Inserted ✓ — now edit it to match your strategy').addClass('success').removeClass('error');
         }
 
@@ -489,18 +536,101 @@
             });
         }
 
+        // Duplicate a rule: fetch the source row, then save a new rule (id 0)
+        // with every attribute copied and " Copy" appended to the label. The
+        // copy is created immediately and shows up in the list; the admin can
+        // then edit it. No confirm — it's non-destructive (creates a new row).
+        function copyRule(id) {
+            if (!id) return;
+            var $btn = $list.find('.zat-copy[data-id="' + id + '"]');
+            $btn.prop('disabled', true).text('Copying…');
+            $.post(ajaxUrl(), { action: 'zen_cortext_attribution_get', nonce: nonce(), id: id })
+                .done(function (resp) {
+                    if (!resp || !resp.success || !resp.data || !resp.data.row) {
+                        alert((resp && resp.data && resp.data.message) || 'Copy failed — could not load the source rule.');
+                        $btn.prop('disabled', false).text('Copy');
+                        return;
+                    }
+                    var r = resp.data.row;
+                    $.post(ajaxUrl(), {
+                        action:               'zen_cortext_attribution_save',
+                        nonce:                nonce(),
+                        id:                   0, // 0 = create new
+                        label:                ((r.label || '') + ' Copy').trim(),
+                        match_utm_source:     r.match_utm_source     || '',
+                        match_utm_medium:     r.match_utm_medium     || '',
+                        match_utm_campaign:   r.match_utm_campaign   || '',
+                        match_referrer_host:  r.match_referrer_host  || '',
+                        match_gclid_present:  parseInt(r.match_gclid_present, 10) ? 1 : 0,
+                        priority:             parseInt(r.priority, 10) || 0,
+                        enabled:              parseInt(r.enabled, 10) ? 1 : 0,
+                        context_text:         r.context_text   || '',
+                        invite_message:       r.invite_message || '',
+                        chips_json:           r.chips_json      || '[]',
+                        intro_card_json:      r.intro_card_json || '',
+                        survey_id:            parseInt(r.survey_id, 10) || 0
+                    })
+                    .done(function (saveResp) {
+                        if (!saveResp || !saveResp.success) {
+                            alert((saveResp && saveResp.data && saveResp.data.message) || 'Copy failed — could not save the new rule.');
+                            $btn.prop('disabled', false).text('Copy');
+                            return;
+                        }
+                        loadList(); // re-renders, replacing the disabled button
+                    })
+                    .fail(function () {
+                        alert('Copy failed — network error while saving.');
+                        $btn.prop('disabled', false).text('Copy');
+                    });
+                })
+                .fail(function () {
+                    alert('Copy failed — network error while loading the source rule.');
+                    $btn.prop('disabled', false).text('Copy');
+                });
+        }
+
+        // Delete from inside the editor (uses the loaded rule's id).
         function deleteRule() {
             var id = parseInt($('#zat-id').val(), 10) || 0;
             if (!id) return;
             if (!window.confirm('Delete this rule? This cannot be undone.')) return;
+            postDelete(id, function () {
+                closeEditor();
+                loadList();
+            });
+        }
+
+        // Delete straight from a list row (no need to open the editor first).
+        function deleteRuleById(id, label) {
+            if (!id) return;
+            var name = label ? '"' + label + '"' : 'this rule';
+            if (!window.confirm('Delete ' + name + '? This cannot be undone.')) return;
+            var $btn = $list.find('.zat-delete-row[data-id="' + id + '"]');
+            $btn.prop('disabled', true).text('Deleting…');
+            postDelete(id, function (ok) {
+                if (ok) {
+                    loadList();
+                } else {
+                    $btn.prop('disabled', false).text('Delete');
+                }
+            });
+        }
+
+        // Shared delete request. Calls done(true) on success, done(false) on
+        // any failure (after alerting). Both delete paths go through here.
+        function postDelete(id, done) {
             $.post(ajaxUrl(), { action: 'zen_cortext_attribution_delete', nonce: nonce(), id: id })
                 .done(function (resp) {
                     if (!resp || !resp.success) {
                         alert((resp && resp.data && resp.data.message) || 'Delete failed');
+                        if (done) done(false);
                         return;
                     }
-                    closeEditor();
-                    loadList();
+                    if (done) done(true);
+                })
+                .fail(function () {
+                    alert('Delete failed — network error.');
+                    if (done) done(false);
                 });
         }
 
@@ -516,6 +646,26 @@
        ============================================================ */
     function initAdsSync() {
         loadCampaigns();
+        applyScriptStatusFilter();
+        $('#zat-script-statuses').on('change.zatAds', applyScriptStatusFilter);
+
+        // Rewrite the CAMPAIGN_STATUSES line in the generated script so the
+        // copied script fetches the campaign statuses chosen in the dropdown.
+        function applyScriptStatusFilter() {
+            var $src = $('#zat-script-source');
+            var $sel = $('#zat-script-statuses');
+            if (!$src.length || !$sel.length) return;
+            var val = $sel.val();
+            var replacement;
+            if (val === 'ALL') {
+                replacement = "var CAMPAIGN_STATUSES   = [];";
+            } else if (val === 'ENABLED,PAUSED') {
+                replacement = "var CAMPAIGN_STATUSES   = ['ENABLED', 'PAUSED'];";
+            } else {
+                replacement = "var CAMPAIGN_STATUSES   = ['ENABLED'];";
+            }
+            $src.val($src.val().replace(/var CAMPAIGN_STATUSES\s*=\s*\[[^\]]*\];/, replacement));
+        }
 
         $('#zat-key-regen').on('click', function () {
             var msg = $('#zat-key-regen').text().indexOf('Regenerate') === 0
@@ -574,17 +724,17 @@
 
         function loadCampaigns() {
             var $body = $('#zat-ads-list-body');
-            $body.html('<tr><td colspan="7"><em>Loading…</em></td></tr>');
+            $body.html('<tr><td colspan="9"><em>Loading…</em></td></tr>');
             $.post(ajaxUrl(), { action: 'zen_cortext_ads_campaigns_list', nonce: nonce() })
                 .done(function (resp) {
                     if (!resp || !resp.success) {
-                        $body.html('<tr><td colspan="7">Failed to load.</td></tr>');
+                        $body.html('<tr><td colspan="9">Failed to load.</td></tr>');
                         return;
                     }
                     renderCampaigns(resp.data.rows || []);
                 })
                 .fail(function () {
-                    $body.html('<tr><td colspan="7">Network error.</td></tr>');
+                    $body.html('<tr><td colspan="9">Network error.</td></tr>');
                 });
         }
 
@@ -605,7 +755,7 @@
                     var n = (resp.data && resp.data.deleted) || 0;
                     $status.text('Cleared ✓ (' + n + ' row' + (n === 1 ? '' : 's') + ' deleted)').addClass('success');
                     $('#zat-ads-summary').text('No campaigns synced yet. Run the script in Google Ads to populate this list.');
-                    $('#zat-ads-list-body').html('<tr><td colspan="7"><em>No campaigns synced yet.</em></td></tr>');
+                    $('#zat-ads-list-body').html('<tr><td colspan="9"><em>No campaigns synced yet.</em></td></tr>');
                     // Button stays disabled — the table is empty, so there's
                     // nothing left to clear. Next sync will re-enable it
                     // implicitly on the next page load.
@@ -619,7 +769,7 @@
         function renderCampaigns(rows) {
             var $body = $('#zat-ads-list-body');
             if (!rows.length) {
-                $body.html('<tr><td colspan="7"><em>No campaigns synced yet.</em></td></tr>');
+                $body.html('<tr><td colspan="9"><em>No campaigns synced yet.</em></td></tr>');
                 return;
             }
             var html = '';
@@ -630,9 +780,14 @@
                 if (r.budget_micros != null && r.budget_micros !== '') {
                     budget = (parseInt(r.budget_micros, 10) / 1000000).toFixed(2);
                 }
+                var isGroup   = (r.type === 'group');
+                var ownId     = isGroup ? (r.ad_group_id || '') : (r.campaign_id || '');
+                var typeLabel = isGroup ? 'Ad group' : 'Campaign';
                 html += '<tr class="zat-ads-row" data-idx="' + i + '">'
+                     + '<td>' + escapeHtml(typeLabel) + '</td>'
                      + '<td><strong>' + escapeHtml(r.campaign_name) + '</strong></td>'
-                     + '<td><code>' + escapeHtml(r.campaign_id) + '</code></td>'
+                     + '<td>' + (isGroup ? escapeHtml(r.ad_group_name || '') : '—') + '</td>'
+                     + '<td><code>' + escapeHtml(ownId) + '</code></td>'
                      + '<td>' + escapeHtml(r.status || '') + '</td>'
                      + '<td>' + (budget ? escapeHtml(budget) : '—') + '</td>'
                      + '<td>' + headlines.length + '</td>'
@@ -642,7 +797,7 @@
                      + '</td>'
                      + '</tr>'
                      + '<tr class="zat-ads-detail" data-idx="' + i + '" style="display:none;">'
-                     + '<td colspan="7" class="zat-ads-detail-cell">' + renderDetail(headlines, keywords) + '</td>'
+                     + '<td colspan="9" class="zat-ads-detail-cell">' + renderDetail(headlines, keywords) + '</td>'
                      + '</tr>';
             });
             $body.html(html);

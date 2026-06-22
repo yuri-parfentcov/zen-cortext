@@ -70,7 +70,7 @@ class Zen_Cortext_Rest {
         register_rest_route('zen-cortext/v1', '/chat/(?P<uid>[a-zA-Z0-9_-]{8,64})/delete', array(
             'methods'             => 'POST',
             'callback'            => array($this, 'handle_chat_delete'),
-            'permission_callback' => '__return_true',
+            'permission_callback' => $this->owner_token_permission_cb('Only the original visitor can delete this conversation.'),
         ));
 
         // Public lead capture from the in-chat contact form. No nonce —
@@ -80,7 +80,7 @@ class Zen_Cortext_Rest {
         register_rest_route('zen-cortext/v1', '/chat/(?P<uid>[a-zA-Z0-9_-]{8,64})/lead', array(
             'methods'             => 'POST',
             'callback'            => array($this, 'handle_chat_lead'),
-            'permission_callback' => '__return_true',
+            'permission_callback' => $this->owner_token_permission_cb('Only the original visitor can attach a lead to this conversation.'),
         ));
 
         // Visitor self-archive: email a copy of the conversation transcript
@@ -90,7 +90,7 @@ class Zen_Cortext_Rest {
         register_rest_route('zen-cortext/v1', '/chat/(?P<uid>[a-zA-Z0-9_-]{8,64})/email', array(
             'methods'             => 'POST',
             'callback'            => array($this, 'handle_chat_email_transcript'),
-            'permission_callback' => '__return_true',
+            'permission_callback' => $this->owner_token_permission_cb('Only the original visitor can email this conversation.'),
         ));
 
         // Admin-only builder chat: streams a focused interview to help an admin
@@ -137,19 +137,28 @@ class Zen_Cortext_Rest {
         register_rest_route('zen-cortext/v1', '/chat/(?P<uid>[a-zA-Z0-9_-]{8,64})/status', array(
             'methods'             => 'GET',
             'callback'            => array($this, 'handle_chat_status'),
-            'permission_callback' => '__return_true',
+            // Exposes the live takeover state (admin attachment + invitable
+            // team availability) for a specific conversation, so it is gated
+            // by the per-chat owner token — the same credential /send,
+            // /invite, /delete use. Legacy/new chats with no stored token
+            // stay unenforced (check_owner_token returns ok/new).
+            'permission_callback' => $this->owner_token_permission_cb('Only the original visitor can read this conversation\'s status.'),
         ));
 
         register_rest_route('zen-cortext/v1', '/chat/(?P<uid>[a-zA-Z0-9_-]{8,64})/invite', array(
             'methods'             => 'POST',
             'callback'            => array($this, 'handle_chat_invite'),
-            'permission_callback' => '__return_true',
+            'permission_callback' => $this->owner_token_permission_cb('Only the original visitor can invite a team member into this conversation.'),
         ));
 
         register_rest_route('zen-cortext/v1', '/chat/(?P<uid>[a-zA-Z0-9_-]{8,64})/poll', array(
             'methods'             => 'GET',
             'callback'            => array($this, 'handle_chat_poll'),
-            'permission_callback' => '__return_true',
+            // Returns live conversation events (admin replies during a
+            // takeover) for a specific chat — gated by the per-chat owner
+            // token so only the originating visitor can read their own
+            // conversation. Legacy/new chats stay unenforced.
+            'permission_callback' => $this->owner_token_permission_cb('Only the original visitor can read this conversation.'),
         ));
 
         /* ---- Live Chat Takeover: admin endpoints (Bearer session auth) ---- */
@@ -325,7 +334,7 @@ class Zen_Cortext_Rest {
         $attribution = (array) $request->get_param('attribution');
         $client_session_uid = (string) $request->get_param('session_uid');
         $ip = $this->client_ip();
-        $ua = isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+        $ua = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '';
 
         $result = Zen_Cortext_Sessions::beacon($attribution, $client_session_uid, $ip, $ua);
         if (is_wp_error($result)) {
@@ -475,7 +484,7 @@ class Zen_Cortext_Rest {
      * hashed so we never persist a raw IP.
      */
     private static function check_and_record_transcribe_rate($ip, $max, $window_sec) {
-        $key    = 'zc_rl_xc_' . md5((string) $ip);
+        $key    = 'zen_cortext_rl_xc_' . md5((string) $ip);
         $now    = time();
         $cutoff = $now - $window_sec;
         $ts     = get_transient($key);
@@ -555,8 +564,9 @@ class Zen_Cortext_Rest {
 
         $attribution = (array) $request->get_param('attribution');
         $attribution = $this->sanitize_attribution($attribution);
-        // Server-side fields (don't trust client).
-        $attribution['user_agent'] = isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+        // Server-side fields (don't trust client). The User-Agent header is
+        // attacker-controlled, so sanitize it like any other input.
+        $attribution['user_agent'] = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '';
         $attribution['ip']         = $this->client_ip();
 
         // Visitor session id from chat.js (minted by the /session/beacon
@@ -848,11 +858,8 @@ class Zen_Cortext_Rest {
             return new WP_Error('zen_cortext_lead', 'Chat not found', array('status' => 404));
         }
 
-        // Only the original visitor can attach a lead to their own chat —
-        // a third party on the share link could otherwise poison the lead
-        // capture (wrong name/email gets emailed to the team).
-        $owner_err = $this->require_chat_owner($uid, $request);
-        if ($owner_err) return $owner_err;
+        // Owner-token gate enforced at registration (owner_token_permission_cb)
+        // so a third party on the share link can't poison the lead capture.
 
         $name     = (string) $request->get_param('name');
         $email    = (string) $request->get_param('email');
@@ -958,22 +965,10 @@ class Zen_Cortext_Rest {
             return new WP_Error('zen_cortext_not_found', 'Chat not found', array('status' => 404));
         }
 
-        // Owner-token gated: a third party with the share link must not be
-        // able to soft-delete someone else's conversation. Legacy rows with
-        // no stored hash stay unenforced (check_owner_token returns 'ok').
-        $owner_token = (string) $request->get_param('owner_token');
-        $owner_token = preg_replace('/[^a-zA-Z0-9_-]/', '', $owner_token);
-        if (strlen($owner_token) > 128) {
-            $owner_token = substr($owner_token, 0, 128);
-        }
-        $owner_check = Zen_Cortext_Chats::check_owner_token($uid, $owner_token);
-        if ($owner_check === 'mismatch') {
-            return new WP_Error(
-                'zen_cortext_forbidden',
-                'Only the original visitor can delete this conversation.',
-                array('status' => 403)
-            );
-        }
+        // Owner-token gate is enforced at route registration via
+        // owner_token_permission_cb() — a third party with the share link
+        // can't soft-delete someone else's conversation. Legacy rows (no
+        // stored hash) stay unenforced.
 
         // Idempotent: if the chat is already deleted (or never existed),
         // we still return success. The visitor's intent ("make this gone
@@ -1006,8 +1001,7 @@ class Zen_Cortext_Rest {
             return new WP_Error('zen_cortext_not_found', 'Chat not found', array('status' => 404));
         }
 
-        $owner_err = $this->require_chat_owner($uid, $request);
-        if ($owner_err) return $owner_err;
+        // Owner-token gate enforced at registration (owner_token_permission_cb).
 
         $email = trim((string) $request->get_param('email'));
         if ($email === '' || !is_email($email)) {
@@ -1140,21 +1134,32 @@ class Zen_Cortext_Rest {
      * stored hash stay unenforced — Zen_Cortext_Chats::check_owner_token
      * returns 'ok' for those.
      */
-    private function require_chat_owner($uid, $request) {
-        $owner_token = (string) $request->get_param('owner_token');
-        $owner_token = preg_replace('/[^a-zA-Z0-9_-]/', '', $owner_token);
-        if (strlen($owner_token) > 128) {
-            $owner_token = substr($owner_token, 0, 128);
-        }
-        $check = Zen_Cortext_Chats::check_owner_token($uid, $owner_token);
-        if ($check === 'mismatch') {
-            return new WP_Error(
-                'zen_cortext_forbidden',
-                'Only the original visitor can perform this action.',
-                array('status' => 403)
-            );
-        }
-        return null;
+    /**
+     * Build the permission_callback for a visitor write endpoint
+     * (delete / lead / email / invite). Declares the owner-token gate at
+     * route-registration time instead of inside the handler. Allows the
+     * request when the owner_token matches the stored hash for {uid}, when
+     * the row is legacy (no stored hash — unenforced), or when it doesn't
+     * exist yet ('new') — the handlers are idempotent / create-on-demand for
+     * those cases. Denies a genuine mismatch with a 403. $forbidden_message
+     * tailors the visitor-facing copy per action.
+     */
+    public function owner_token_permission_cb($forbidden_message = 'Only the original visitor can perform this action.') {
+        return function ($request) use ($forbidden_message) {
+            $uid = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $request->get_param('uid'));
+            // Empty/garbage uid: let the handler return its own 404 shape.
+            if ($uid === '') {
+                return true;
+            }
+            $token = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $request->get_param('owner_token'));
+            if (strlen($token) > 128) {
+                $token = substr($token, 0, 128);
+            }
+            if (Zen_Cortext_Chats::check_owner_token($uid, $token) === 'mismatch') {
+                return new WP_Error('zen_cortext_forbidden', $forbidden_message, array('status' => 403));
+            }
+            return true;
+        };
     }
 
     /**
@@ -1182,7 +1187,7 @@ class Zen_Cortext_Rest {
      * window naturally via WP's own transient GC.
      */
     private static function check_and_record_rate_limit($chat_uid, $max) {
-        $key = 'zc_rl_' . md5((string) $chat_uid);
+        $key = 'zen_cortext_rl_' . md5((string) $chat_uid);
         $now = time();
         $cutoff = $now - 3600;
         $timestamps = get_transient($key);
@@ -1315,7 +1320,7 @@ class Zen_Cortext_Rest {
         // Honor common proxy headers but only the first hop, and only when present.
         foreach (array('HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR') as $key) {
             if (!empty($_SERVER[$key])) {
-                $ip = (string) $_SERVER[$key];
+                $ip = sanitize_text_field(wp_unslash($_SERVER[$key]));
                 if (strpos($ip, ',') !== false) {
                     $ip = trim(explode(',', $ip)[0]);
                 }
@@ -1408,11 +1413,9 @@ class Zen_Cortext_Rest {
             return new WP_Error('zen_cortext_bad_request', 'uid and user_id required', array('status' => 400));
         }
 
-        // Inviting a team member emails/notifies them about a "visitor"
-        // chat — a third party on a share link mustn't be able to spam-page
-        // the team into someone else's conversation.
-        $owner_err = $this->require_chat_owner($uid, $request);
-        if ($owner_err) return $owner_err;
+        // Owner-token gate enforced at registration (owner_token_permission_cb)
+        // so a third party on a share link can't spam-page the team into
+        // someone else's conversation.
 
         $result = Zen_Cortext_Takeover::invite($uid, $user_id);
         if (is_wp_error($result)) {
@@ -1819,22 +1822,12 @@ class Zen_Cortext_Rest {
             @flush();
         };
         $helper_messages = array(array('role' => 'user', 'content' => $transcript));
-        if (Zen_Cortext_API::processor() === 'cli') {
-            Zen_Cortext_API::stream_chat_via_cli(
-                $system,
-                $helper_messages,
-                Zen_Cortext_API::cli_model(),
-                $on_event,
-                array('timeout' => 180)
-            );
-        } else {
-            Zen_Cortext_API::stream_chat_via_api(
-                $system,
-                $helper_messages,
-                $on_event,
-                array('timeout' => 180)
-            );
-        }
+        Zen_Cortext_API::stream_internal(
+            $system,
+            $helper_messages,
+            $on_event,
+            array('timeout' => 180)
+        );
         exit;
     }
 
@@ -1930,31 +1923,35 @@ class Zen_Cortext_Rest {
             @flush();
         };
 
-        // Route per the admin's processor preference. Brainstorm always uses
-        // Opus on either backend — deeper reasoning is the whole point of
-        // this surface, regardless of the global cli_model / model setting.
-        if (Zen_Cortext_API::processor() === 'cli') {
-            $result = Zen_Cortext_API::stream_chat_via_cli(
-                $system_combined,
-                $messages,
-                'opus',
-                $on_event,
-                array('timeout' => 600)
-            );
-        } else {
-            $result = Zen_Cortext_API::stream_chat_via_api(
-                $system_combined,
-                $messages,
-                $on_event,
-                array(
-                    'model'           => Zen_Cortext_API::BRAINSTORM_MODEL,
-                    'max_tokens'      => Zen_Cortext_API::BRAINSTORM_MAX_TOKENS,
-                    'thinking_budget' => Zen_Cortext_API::BRAINSTORM_THINKING_BUDGET,
-                    'cache_static'    => true,
-                    'timeout'         => 600,
-                )
-            );
+        // Resolve the model the admin picked in the UI. Anything not in the
+        // allow-list falls back to BRAINSTORM_MODEL (Opus 4.6), so a missing
+        // or spoofed value can never select something unexpected.
+        $model_cfg = Zen_Cortext_API::brainstorm_model_config(
+            (string) $request->get_param('model')
+        );
+
+        // Built-in backend is the streaming HTTP API; a companion CLI plugin
+        // may intercept via the zen_cortext_stream_internal filter. The API
+        // path uses the full model id (key-billed); the CLI companion reads
+        // the model's alias from opts['cli_model'] (subscription-billed).
+        $opts = array(
+            'model'        => $model_cfg['id'],
+            'max_tokens'   => $model_cfg['max_tokens'],
+            'cache_static' => true,
+            'timeout'      => 600,
+            'cli_model'    => $model_cfg['cli'],
+        );
+        // Only request extended thinking for models that support it —
+        // passing a thinking budget to a non-thinking model errors out.
+        if (!empty($model_cfg['thinking'])) {
+            $opts['thinking_budget'] = Zen_Cortext_API::BRAINSTORM_THINKING_BUDGET;
         }
+        $result = Zen_Cortext_API::stream_internal(
+            $system_combined,
+            $messages,
+            $on_event,
+            $opts
+        );
 
         // Persist the conversation if we got an actual response. Skip saving
         // on error so a failed turn doesn't replace working state.

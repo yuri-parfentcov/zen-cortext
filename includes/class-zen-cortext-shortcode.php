@@ -19,6 +19,48 @@ class Zen_Cortext_Shortcode {
         return self::$instance;
     }
 
+    /**
+     * Custom code injection for the standalone chat templates.
+     *
+     * The full-page chat (/talk/) owns the whole document and deliberately
+     * skips wp_head()/wp_footer(), so a site's normal header/footer injectors
+     * (theme, GTM4WP, "Insert Headers and Footers", analytics plugins) never
+     * fire there. These three options let the admin paste ANY markup — GTM,
+     * GA4, Meta Pixel, verification meta tags, etc. — into the head, after the
+     * opening <body>, and before </body> respectively. Theme-independent.
+     *
+     * The stored code is echoed verbatim by design (it is markup/script). It is
+     * sanitized on save in Zen_Cortext_Admin::sanitize_custom_code(): stored raw
+     * only for users with the unfiltered_html capability, otherwise filtered
+     * through wp_kses_post() — the same model core uses for the Custom HTML
+     * widget and that the header/footer-code plugins use.
+     */
+    public static function print_header_code() {
+        $code = (string) get_option('zen_cortext_header_code', '');
+        if (trim($code) === '') return;
+        echo "\n";
+        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-authored custom code, capability-gated by unfiltered_html on save; escaping would defeat the feature.
+        echo "\n";
+    }
+
+    /** Custom code printed immediately after the opening <body> tag. */
+    public static function print_body_code() {
+        $code = (string) get_option('zen_cortext_body_code', '');
+        if (trim($code) === '') return;
+        echo "\n";
+        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-authored custom code, capability-gated by unfiltered_html on save; escaping would defeat the feature.
+        echo "\n";
+    }
+
+    /** Custom code printed just before the closing </body> tag. */
+    public static function print_footer_code() {
+        $code = (string) get_option('zen_cortext_footer_code', '');
+        if (trim($code) === '') return;
+        echo "\n";
+        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-authored custom code, capability-gated by unfiltered_html on save; escaping would defeat the feature.
+        echo "\n";
+    }
+
     const PAGE_TEMPLATE_SLUG = 'zen-cortext-chat-page.php';
 
     private function __construct() {
@@ -70,24 +112,11 @@ class Zen_Cortext_Shortcode {
     }
 
     public function register_assets() {
-        // Resolve chat.css from the editable-asset registry: live URL
-        // (uploads/zen-cortext/assets/chat.css) when the admin has saved
-        // an edited copy, factory URL inside the plugin tree otherwise.
-        // The mtime cache-buster baked into asset_url() means saves
-        // invalidate the browser cache without bumping plugin version.
-        $chat_css_url = Zen_Cortext_Template_Renderer::asset_url('chat.css');
-        wp_register_style(
-            'zen-cortext-public',
-            $chat_css_url,
-            array(),
-            ZEN_CORTEXT_VERSION
-        );
-        wp_register_style(
-            'zen-cortext-yanone',
-            'https://fonts.googleapis.com/css2?family=Yanone+Kaffeesatz:wght@400;500;600;700&display=swap',
-            array(),
-            ZEN_CORTEXT_VERSION
-        );
+        // chat.css now lives in the DB (editable via the Template Editor).
+        // register_chat_css() enqueues the bundled factory file when the
+        // admin hasn't customized it (browser-cacheable), or attaches the
+        // saved source as inline CSS that prints once the handle is enqueued.
+        Zen_Cortext_Template_Renderer::register_chat_css('zen-cortext-public');
         wp_register_script(
             'zen-cortext-public',
             ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.js',
@@ -95,37 +124,82 @@ class Zen_Cortext_Shortcode {
             ZEN_CORTEXT_VERSION,
             true
         );
+
+        // Standalone full-page chat template chrome (the page layout/rail/
+        // modal CSS + the small modal-interaction JS). Registered here so
+        // the template can enqueue + print them through the core pipeline
+        // instead of hand-writing <link>/<script> tags.
+        wp_register_style(
+            'zen-cortext-chat-page',
+            ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat-page.css',
+            array('zen-cortext-public'),
+            ZEN_CORTEXT_VERSION
+        );
+        wp_register_script(
+            'zen-cortext-chat-page',
+            ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat-page.js',
+            array(),
+            ZEN_CORTEXT_VERSION,
+            true
+        );
+
+        // Standalone live-chat admin (PWA) template assets.
+        wp_register_style(
+            'zen-cortext-livechat',
+            ZEN_CORTEXT_PLUGIN_URL . 'public/assets/livechat.css',
+            array(),
+            ZEN_CORTEXT_VERSION
+        );
+        wp_register_script(
+            'zen-cortext-livechat',
+            ZEN_CORTEXT_PLUGIN_URL . 'public/assets/livechat.js',
+            array(),
+            ZEN_CORTEXT_VERSION,
+            true
+        );
+    }
+
+    /**
+     * Build the zenCortextConfig payload localized onto the chat script.
+     * Shared by the shortcode embed path and the standalone chat-page
+     * template so both agree on the runtime config shape.
+     */
+    public static function chat_config_payload() {
+        return array(
+            'restUrl'               => esc_url_raw(rest_url('zen-cortext/v1/send')),
+            'restRoot'              => esc_url_raw(rest_url('zen-cortext/v1')),
+            'attributionContextUrl' => esc_url_raw(rest_url('zen-cortext/v1/attribution-context')),
+            'transcribeUrl'         => esc_url_raw(rest_url('zen-cortext/v1/transcribe')),
+            'voiceEnabled'          => (bool) get_option('zen_cortext_voice_enabled', false),
+            'voiceMaxSec'           => 60,
+            'introCard'             => get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card()),
+            'welcomeMessage'        => get_option('zen_cortext_welcome_message', Zen_Cortext_Defaults::welcome_message()),
+            'defaultChips'          => array_values((array) get_option('zen_cortext_default_chips', array())),
+        );
     }
 
     public function render($atts = array()) {
         $atts = shortcode_atts(array(), $atts, 'zen_cortext');
 
         if (!$this->assets_enqueued) {
-            wp_enqueue_style('zen-cortext-yanone');
             wp_enqueue_style('zen-cortext-public');
             wp_enqueue_script('zen-cortext-public');
-            $default_chips = (array) get_option('zen_cortext_default_chips', array());
-            wp_localize_script('zen-cortext-public', 'zenCortextConfig', array(
-                'restUrl'               => esc_url_raw(rest_url('zen-cortext/v1/send')),
-                'restRoot'              => esc_url_raw(rest_url('zen-cortext/v1')),
-                'attributionContextUrl' => esc_url_raw(rest_url('zen-cortext/v1/attribution-context')),
-                'transcribeUrl'         => esc_url_raw(rest_url('zen-cortext/v1/transcribe')),
-                'voiceEnabled'          => (bool) get_option('zen_cortext_voice_enabled', false),
-                'voiceMaxSec'           => 60,
-                'introCard'             => get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card()),
-                'welcomeMessage'        => get_option('zen_cortext_welcome_message', Zen_Cortext_Defaults::welcome_message()),
-                'defaultChips'          => array_values($default_chips),
-            ));
+            wp_localize_script('zen-cortext-public', 'zenCortextConfig', self::chat_config_payload());
+
+            // Per-site design-settings overrides (--zc-* color tokens +
+            // font-family / font-size) attached AFTER chat.css so the
+            // cascade beats the published defaults. Empty when nothing is
+            // configured, so this is a no-op on default sites.
+            $override_css = self::build_color_override_css();
+            if ($override_css !== '') {
+                wp_add_inline_style('zen-cortext-public', $override_css);
+            }
             $this->assets_enqueued = true;
         }
 
         $intro = get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card());
 
-        $color_override = self::build_color_override_style();
-
         ob_start();
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $color_override is a built <style> block of validated tokens.
-        if ($color_override !== '') echo $color_override;
         // chat.php is a thin controller that calls the template renderer.
         // Preview-file routing is handled inside the renderer, not here.
         include ZEN_CORTEXT_PLUGIN_DIR . 'public/views/chat.php';
@@ -133,13 +207,14 @@ class Zen_Cortext_Shortcode {
     }
 
     /**
-     * Build the inline <style> tag that overrides --zc-* tokens from the
+     * Build the raw CSS that overrides --zc-* tokens from the
      * zen_cortext_chat_colors option AND the typography options
      * (zen_cortext_font_family / zen_cortext_font_size). Returns an
      * empty string when nothing is configured so the published chat.css
-     * defaults stand alone.
+     * defaults stand alone. This is the "design settings" output — it is
+     * attached via wp_add_inline_style(), never echoed as a raw <style>.
      */
-    public static function build_color_override_style() {
+    public static function build_color_override_css() {
         $token_rules = array();
         $direct_rules = '';
 
@@ -187,7 +262,7 @@ class Zen_Cortext_Shortcode {
             $css .= ':root,.zen-cortext-root{' . implode('', $token_rules) . '}';
         }
         $css .= $direct_rules;
-        return '<style id="zen-cortext-color-overrides">' . $css . '</style>';
+        return $css;
     }
 
     /**
@@ -248,8 +323,14 @@ class Zen_Cortext_Shortcode {
         $beacon_url = esc_url_raw(rest_url('zen-cortext/v1/session/beacon'));
         if ($beacon_url === '') return;
         $gdpr = (bool) get_option('zen_cortext_sessions_gdpr_compliant', false);
+
+        // Capture the (identical-for-every-guest) beacon JS and print it
+        // through wp_print_inline_script_tag() — the core inline-script
+        // printer (WP 5.7+) — instead of a hand-written <script> tag.
+        // Kept inline (no enqueued file) on purpose: the body never varies,
+        // so Varnish caching it inside the HTML page avoids an extra request.
+        ob_start();
         ?>
-<script>
 (function(){
   try {
     var BEACON = <?php echo wp_json_encode($beacon_url); ?>;
@@ -364,7 +445,8 @@ class Zen_Cortext_Shortcode {
     }, 500);
   } catch(e){}
 })();
-</script>
         <?php
+        $js = ob_get_clean();
+        wp_print_inline_script_tag($js);
     }
 }

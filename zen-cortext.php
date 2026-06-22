@@ -3,7 +3,7 @@
  * Plugin Name: Zen Cortext - Your AI SDR for inbound
  * Plugin URI: https://github.com/yuri-parfentcov/zen-cortext
  * Description: An AI SDR that reads your site, talks to your visitors, and knows when to call you. Indexes your published content into a knowledge base and serves a streaming chat through a [zen_cortext] shortcode. You bring your own Anthropic API key. Not affiliated with Anthropic, Groq, OpenAI, or Google.
- * Version: 2.35.0
+ * Version: 2.39.13
  * Requires at least: 5.9
  * Requires PHP: 7.4
  * Author: Zen Republic Agency
@@ -18,12 +18,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ZEN_CORTEXT_VERSION', '2.35.0');
+define('ZEN_CORTEXT_VERSION', '2.39.13');
 define('ZEN_CORTEXT_PLUGIN_FILE', __FILE__);
 define('ZEN_CORTEXT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ZEN_CORTEXT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('ZEN_CORTEXT_TEXT_DOMAIN', 'zen-cortext');
-define('ZEN_CORTEXT_DB_VERSION', '17');
+define('ZEN_CORTEXT_DB_VERSION', '19');
 
 require_once ZEN_CORTEXT_PLUGIN_DIR . 'includes/class-zen-cortext.php';
 

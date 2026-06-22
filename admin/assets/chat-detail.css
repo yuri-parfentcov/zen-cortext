@@ -1,0 +1,150 @@
+/*
+ * Zen Cortext admin — Chat detail page
+ * Moved out of an inline <style> block into an enqueued stylesheet.
+ */
+
+.zen-cortext-wrap .zcd-meta {
+    background: #fff; border: 1px solid #c3c4c7; padding: 12px 16px;
+    margin: 16px 0; display: flex; flex-wrap: wrap; gap: 28px; font-size: 13px;
+}
+.zen-cortext-wrap .zcd-grid {
+    display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px;
+}
+@media (max-width: 1100px) {
+    .zen-cortext-wrap .zcd-grid { grid-template-columns: 1fr; }
+}
+.zen-cortext-wrap .zcd-conversation, .zen-cortext-wrap .zcd-attribution {
+    background: #fff; border: 1px solid #c3c4c7; padding: 18px 22px;
+}
+.zen-cortext-wrap .zcd-msg { margin-bottom: 18px; }
+.zen-cortext-wrap .zcd-msg-role {
+    font-size: 10px; font-weight: 700; color: #50575e;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+}
+.zen-cortext-wrap .zcd-msg-bubble {
+    padding: 12px 16px; border-radius: 8px; font-size: 14px; line-height: 1.5;
+    white-space: pre-wrap; word-wrap: break-word;
+}
+.zen-cortext-wrap .zcd-msg-user .zcd-msg-bubble {
+    background: #2271b1; color: #fff; border-bottom-right-radius: 2px;
+}
+.zen-cortext-wrap .zcd-msg-assistant .zcd-msg-bubble {
+    background: #f6f7f7; color: #1d2327; border-left: 3px solid #DBEB7E;
+    border-bottom-left-radius: 2px;
+}
+.zen-cortext-wrap .zcd-attribution th { width: 110px; padding: 8px 10px; font-size: 12px; }
+.zen-cortext-wrap .zcd-attribution td { padding: 8px 10px; font-size: 12px; word-break: break-all; }
+.zen-cortext-wrap .zcd-empty { color: #aaa; }
+.zen-cortext-wrap .zcd-attribution code {
+    background: #f0f0f1; padding: 2px 6px; border-radius: 3px;
+    font-size: 11px;
+}
+.zen-cortext-wrap .zcd-lead {
+    margin: 16px 0 20px;
+    padding: 14px 18px;
+    background: #e7f3d4;
+    border-left: 4px solid #7a9c2e;
+    border-radius: 4px;
+}
+.zen-cortext-wrap .zcd-lead-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px; font-size: 14px;
+}
+.zen-cortext-wrap .zcd-lead-head strong { color: #3a5c1a; font-size: 15px; }
+.zen-cortext-wrap .zcd-lead-when { color: #6b7b4a; font-size: 12px; }
+.zen-cortext-wrap .zcd-lead-body { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 14px; }
+.zen-cortext-wrap .zcd-lead-k {
+    color: #6b7b4a; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; margin-right: 6px;
+}
+.zen-cortext-wrap .zcd-lead-v { color: #222; }
+.zen-cortext-wrap .zcd-enrichment {
+    margin-top: 6px; padding: 4px 0 0 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; color: #787c82; line-height: 1.6;
+    display: flex; flex-wrap: wrap; gap: 4px 10px;
+}
+.zen-cortext-wrap .zcd-enrichment .zcd-tag-k {
+    color: #a7aaae; margin-right: 4px;
+}
+.zen-cortext-wrap .zcd-enrichment .zcd-tag-v {
+    color: #3c434a;
+}
+
+/* Admin handler block — uses the existing lead-card visual language with a
+   distinct color so it reads as a different facet of the same chat. */
+.zen-cortext-wrap .zcd-admin {
+    margin: 16px 0 20px;
+    padding: 14px 18px;
+    background: #f0f6fc;
+    border-left: 4px solid #2271b1;
+    border-radius: 4px;
+}
+.zen-cortext-wrap .zcd-admin-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px; font-size: 14px;
+}
+.zen-cortext-wrap .zcd-admin-head strong { color: #1d4d80; font-size: 15px; }
+.zen-cortext-wrap .zcd-admin-when { color: #4a6b8a; font-size: 12px; }
+.zen-cortext-wrap .zcd-admin-body { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 14px; }
+.zen-cortext-wrap .zcd-admin-k {
+    color: #4a6b8a; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; margin-right: 6px;
+}
+.zen-cortext-wrap .zcd-admin-v { color: #222; }
+.zen-cortext-wrap .zcd-admin code {
+    background: #d9e7f2; color: #1d4d80; padding: 1px 6px; border-radius: 3px; font-size: 11px;
+}
+
+/* Right column wraps the attribution table + sessions block, stacked. */
+.zen-cortext-wrap .zcd-right { display: flex; flex-direction: column; gap: 18px; }
+
+/* Sessions block — narrow right-column variant matching the attribution
+   table's visual weight. Uses a single-column table so labels and values
+   don't collide in the tight horizontal space. */
+.zen-cortext-wrap .zcd-sessions {
+    background: #fff; border: 1px solid #c3c4c7; padding: 18px 22px;
+}
+.zen-cortext-wrap .zcd-sessions h2 { margin: 0 0 10px; font-size: 14px; }
+.zen-cortext-wrap .zcd-sessions h3 {
+    margin: 14px 0 4px; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .05em; color: #50575e;
+}
+.zen-cortext-wrap .zcd-session-head {
+    display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px;
+}
+.zen-cortext-wrap .zcd-session-head strong { font-size: 12px; color: #50575e; }
+.zen-cortext-wrap .zcd-session-uid code {
+    font-size: 11px; background: #f0f0f1; padding: 1px 6px; border-radius: 3px;
+    display: inline-block; max-width: 100%; overflow-wrap: anywhere;
+}
+.zen-cortext-wrap .zcd-session-table th {
+    width: 110px; font-size: 12px; padding: 6px 10px; text-align: left;
+}
+.zen-cortext-wrap .zcd-session-table td {
+    font-size: 12px; padding: 6px 10px; word-break: break-all;
+}
+.zen-cortext-wrap .zcd-session-table code {
+    background: #f0f0f1; padding: 2px 6px; border-radius: 3px; font-size: 11px;
+}
+.zen-cortext-wrap .zcd-session-empty {
+    margin: 4px 0 0; color: #646970; font-size: 12px;
+}
+.zen-cortext-wrap .zcd-session-related .description {
+    margin: 2px 0 8px; font-style: italic; color: #646970; font-size: 11px;
+}
+.zen-cortext-wrap .zcd-related-list {
+    list-style: none; margin: 0; padding: 0;
+    border-top: 1px solid #f0f0f1;
+}
+.zen-cortext-wrap .zcd-related-list li {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid #f0f0f1; font-size: 12px;
+}
+.zen-cortext-wrap .zcd-related-when {
+    color: #646970; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; flex-shrink: 0;
+}
+.zen-cortext-wrap .zcd-related-chats {
+    margin-left: auto; color: #2271b1; font-size: 11px; font-weight: 600;
+}

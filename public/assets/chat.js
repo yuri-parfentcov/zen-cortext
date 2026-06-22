@@ -875,7 +875,9 @@
 
         function checkChatStatus() {
             if (!restRoot || !chatUid) return;
-            fetch(restRoot + '/chat/' + encodeURIComponent(chatUid) + '/status', {
+            // Pass the per-chat owner token so the endpoint can verify the
+            // caller owns this conversation (status is gated server-side).
+            fetch(restRoot + '/chat/' + encodeURIComponent(chatUid) + '/status?owner_token=' + encodeURIComponent(ownerToken), {
                 headers: { 'Accept': 'application/json' }
             })
             .then(function (r) { return r.json(); })
@@ -1053,7 +1055,9 @@
 
         function pollForEvents() {
             if (!restRoot || !chatUid) return;
-            fetch(restRoot + '/chat/' + encodeURIComponent(chatUid) + '/poll?since_id=' + lastPollEventId, {
+            // Owner token gates this endpoint server-side — only the
+            // originating visitor can read their conversation's live events.
+            fetch(restRoot + '/chat/' + encodeURIComponent(chatUid) + '/poll?since_id=' + lastPollEventId + '&owner_token=' + encodeURIComponent(ownerToken), {
                 headers: { 'Accept': 'application/json' }
             })
             .then(function (r) { return r.json(); })

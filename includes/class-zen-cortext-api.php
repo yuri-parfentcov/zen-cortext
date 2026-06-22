@@ -8,19 +8,18 @@
  */
 
 /*
- * phpcs:disable Generic.PHP.ForbiddenFunctions.Found
- * phpcs:disable WordPress.WP.AlternativeFunctions.curl_curl_init,WordPress.WP.AlternativeFunctions.curl_curl_setopt_array,WordPress.WP.AlternativeFunctions.curl_curl_exec,WordPress.WP.AlternativeFunctions.curl_curl_close,WordPress.WP.AlternativeFunctions.curl_curl_errno,WordPress.WP.AlternativeFunctions.curl_curl_error
- * phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose,WordPress.WP.AlternativeFunctions.unlink_unlink
+ * phpcs:disable WordPress.WP.AlternativeFunctions.curl_curl_setopt
  *
  * Justification: this class streams Server-Sent Events from the Anthropic
- * API directly to the visitor's browser. wp_remote_get() / Requests cannot
- * stream chunked responses — they buffer the entire body — so a direct
- * cURL handle with CURLOPT_WRITEFUNCTION is required for the streaming
- * chat UX. tempfile fclose() / unlink() pair with cURL handles and
- * proc_open() pipes; WP_Filesystem operates on the WP uploads dir, not
- * arbitrary tempfiles. proc_open() drives the optional Claude Code CLI
- * processor, which an admin enables via the Settings → Connection toggle
- * when self-hosting the binary; the default HTTP path does not invoke it.
+ * API directly to the visitor's browser. The request goes through the
+ * WordPress HTTP API (wp_remote_post); because wp_remote_post() buffers the
+ * whole body, we attach CURLOPT_WRITEFUNCTION / CURLOPT_HEADERFUNCTION to the
+ * underlying cURL handle via the core http_api_curl action (the documented
+ * way to set cURL options for an HTTP-API request) so the SSE body can be
+ * consumed chunk-by-chunk — hence the remaining curl_setopt calls. Every AI
+ * backend in this class is the hosted Anthropic HTTP API; the optional local
+ * Claude Code CLI processor lives in a separate companion plugin that hooks
+ * the zen_cortext_complete_text / zen_cortext_stream_internal filters.
  */
 
 if (!defined('ABSPATH')) {
@@ -50,6 +49,47 @@ class Zen_Cortext_API {
     const BRAINSTORM_THINKING_BUDGET  = 8000;
     const BRAINSTORM_MAX_TOKENS       = 24000;
 
+    /**
+     * Models the admin may pick for a brainstorm turn. Keyed by API model id;
+     * each entry carries the CLI alias (for the subscription backend), a
+     * human label, whether the model supports extended thinking, and a
+     * model-appropriate max_tokens cap. BRAINSTORM_MODEL stays the default so
+     * existing behaviour is unchanged unless the admin chooses otherwise.
+     */
+    public static function brainstorm_models() {
+        return array(
+            'claude-opus-4-6' => array(
+                'label'      => 'Opus 4.6 — deepest reasoning (most expensive)',
+                'cli'        => 'opus',
+                'thinking'   => true,
+                'max_tokens' => self::BRAINSTORM_MAX_TOKENS,
+            ),
+            'claude-sonnet-4-6' => array(
+                'label'      => 'Sonnet 4.6 — balanced cost / quality',
+                'cli'        => 'sonnet',
+                'thinking'   => true,
+                'max_tokens' => self::BRAINSTORM_MAX_TOKENS,
+            ),
+            'claude-haiku-4-5' => array(
+                'label'      => 'Haiku 4.5 — fastest & cheapest',
+                'cli'        => 'haiku',
+                'thinking'   => false,
+                'max_tokens' => 8000,
+            ),
+        );
+    }
+
+    /**
+     * Resolve a requested brainstorm model id to its config, falling back to
+     * BRAINSTORM_MODEL for anything not in the allow-list. Returns the config
+     * array with the resolved 'id' merged in.
+     */
+    public static function brainstorm_model_config($requested = '') {
+        $models = self::brainstorm_models();
+        $id     = isset($models[$requested]) ? $requested : self::BRAINSTORM_MODEL;
+        return array_merge($models[$id], array('id' => $id));
+    }
+
     public static function api_key() {
         return trim((string) get_option('zen_cortext_api_key', ''));
     }
@@ -66,17 +106,46 @@ class Zen_Cortext_API {
         return (int) get_option('zen_cortext_max_tokens', 2048);
     }
 
-    public static function processor() {
-        $p = get_option('zen_cortext_processor', 'api');
-        return $p === 'cli' ? 'cli' : 'api';
+    /**
+     * Run a one-shot, non-streaming text completion for an internal admin
+     * job (KB classify / restructure, artifact builder/synthesizer). The
+     * built-in backend is the Anthropic HTTP API. A companion plugin can
+     * short-circuit this via the `zen_cortext_complete_text` filter to use an
+     * alternative backend (e.g. the optional Claude Code CLI add-on):
+     * returning a string or WP_Error takes over, returning null falls through
+     * to the HTTP API. $opts keys: model, max_tokens (and any the companion
+     * reads, e.g. timeout).
+     */
+    public static function complete_text($prompt, $opts = array()) {
+        $alt = apply_filters('zen_cortext_complete_text', null, (string) $prompt, $opts);
+        if (is_string($alt) || is_wp_error($alt)) {
+            return $alt;
+        }
+        $response = self::request_json(array(
+            'model'      => isset($opts['model']) ? $opts['model'] : self::model(),
+            'max_tokens' => isset($opts['max_tokens']) ? (int) $opts['max_tokens'] : self::max_tokens(),
+            'messages'   => array(array('role' => 'user', 'content' => (string) $prompt)),
+        ));
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        return isset($response['content'][0]['text']) ? $response['content'][0]['text'] : '';
     }
 
-    public static function cli_path() {
-        return trim((string) get_option('zen_cortext_cli_path', 'claude'));
-    }
-
-    public static function cli_model() {
-        return trim((string) get_option('zen_cortext_cli_model', 'sonnet'));
+    /**
+     * Stream an internal admin chat (Brainstorm, Template-Editor AI, artifact
+     * chat). The built-in backend is the streaming Anthropic HTTP API. A
+     * companion plugin can short-circuit via the `zen_cortext_stream_internal`
+     * filter (returning an ['ok','text','stderr'] array) to use an alternative
+     * backend; returning null falls through to the HTTP API. $on_event
+     * receives each SSE event JSON string, exactly like stream_chat_via_api().
+     */
+    public static function stream_internal($system_prompt, $messages, $on_event, $opts = array()) {
+        $handled = apply_filters('zen_cortext_stream_internal', null, $system_prompt, $messages, $on_event, $opts);
+        if (is_array($handled)) {
+            return $handled;
+        }
+        return self::stream_chat_via_api($system_prompt, $messages, $on_event, $opts);
     }
 
     /**
@@ -90,27 +159,17 @@ class Zen_Cortext_API {
      * Returns array(success => bool, message => string).
      */
     public static function test_connection($overrides = array()) {
-        $processor = isset($overrides['processor']) && $overrides['processor'] !== ''
-            ? (in_array($overrides['processor'], array('api', 'cli'), true) ? $overrides['processor'] : 'api')
-            : self::processor();
-        $api_key   = isset($overrides['api_key'])   ? trim((string) $overrides['api_key'])   : self::api_key();
-        $cli_path  = isset($overrides['cli_path'])  ? trim((string) $overrides['cli_path'])  : self::cli_path();
-        $cli_model = isset($overrides['cli_model']) ? trim((string) $overrides['cli_model']) : self::cli_model();
-        $api_model = self::model();
-
-        if ($processor === 'cli') {
-            if ($cli_path === '') {
-                return array('success' => false, 'message' => 'CLI path is empty.');
-            }
-            if ($cli_model === '') {
-                return array('success' => false, 'message' => 'CLI model is empty.');
-            }
-            $result = self::cli_ping($cli_path, $cli_model, 30);
-            if (is_wp_error($result)) {
-                return array('success' => false, 'message' => 'CLI: ' . $result->get_error_message());
-            }
-            return array('success' => true, 'message' => 'CLI OK at ' . $cli_path . ' (model: ' . $cli_model . ')');
+        // A companion plugin (e.g. the Claude Code CLI add-on) can handle the
+        // connection test for its own backend by returning a
+        // ['success'=>bool,'message'=>string] array; returning null lets the
+        // built-in Anthropic HTTP API test run.
+        $alt = apply_filters('zen_cortext_test_connection', null, $overrides);
+        if (is_array($alt) && isset($alt['success'])) {
+            return $alt;
         }
+
+        $api_key   = isset($overrides['api_key']) ? trim((string) $overrides['api_key']) : self::api_key();
+        $api_model = self::model();
 
         if ($api_key === '') {
             return array('success' => false, 'message' => 'API key is empty.');
@@ -146,65 +205,6 @@ class Zen_Cortext_API {
     }
 
     /**
-     * Minimal CLI smoke test using explicit binary + model so we can probe
-     * unsaved overrides from the Settings page without touching cli_path()
-     * / cli_model() (which read the saved options).
-     */
-    private static function cli_ping($bin, $model, $timeout_sec = 30) {
-        if (!function_exists('proc_open')) {
-            return new WP_Error('zen_cortext_cli', 'proc_open() is disabled — CLI mode unavailable.');
-        }
-        $tmpfile = tempnam(sys_get_temp_dir(), 'zen_cortext_ping_');
-        if ($tmpfile === false) {
-            return new WP_Error('zen_cortext_cli', 'Could not create tmp file.');
-        }
-        file_put_contents($tmpfile, 'ping');
-        $cmd = 'cat ' . escapeshellarg($tmpfile)
-             . ' | ' . escapeshellcmd($bin)
-             . ' --print --model ' . escapeshellarg($model);
-        $descriptors = array(
-            0 => array('pipe', 'r'),
-            1 => array('pipe', 'w'),
-            2 => array('pipe', 'w'),
-        );
-        $proc = @proc_open($cmd, $descriptors, $pipes);
-        if (!is_resource($proc)) {
-            @unlink($tmpfile);
-            return new WP_Error('zen_cortext_cli', "Failed to launch CLI: {$bin}");
-        }
-        fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-        $stdout = '';
-        $stderr = '';
-        $start  = time();
-        $exit   = null;
-        while (true) {
-            $status = proc_get_status($proc);
-            $stdout .= stream_get_contents($pipes[1]);
-            $stderr .= stream_get_contents($pipes[2]);
-            if (!$status['running']) {
-                $exit = (int) $status['exitcode'];
-                $stdout .= stream_get_contents($pipes[1]);
-                $stderr .= stream_get_contents($pipes[2]);
-                break;
-            }
-            if (time() - $start > $timeout_sec) {
-                @proc_terminate($proc, 15);
-                @fclose($pipes[1]); @fclose($pipes[2]); @proc_close($proc); @unlink($tmpfile);
-                return new WP_Error('zen_cortext_cli', 'Timeout after ' . $timeout_sec . 's');
-            }
-            usleep(100000);
-        }
-        @fclose($pipes[1]); @fclose($pipes[2]); @proc_close($proc); @unlink($tmpfile);
-        if ($exit !== 0) {
-            $err = trim($stderr) !== '' ? trim($stderr) : 'exit code ' . $exit;
-            return new WP_Error('zen_cortext_cli', $err);
-        }
-        return trim($stdout);
-    }
-
-    /**
      * Classify a single post. Returns a valid category slug (from
      * KB_Types + 'other') or WP_Error on API/CLI failure.
      */
@@ -229,20 +229,11 @@ class Zen_Cortext_API {
             '{content}' => (string) $content,
         ));
 
-        if (self::processor() === 'cli') {
-            $text = self::cli_request($prompt, 90);
-        } else {
-            $response = self::request_json(array(
-                'model'      => self::classify_model(),
-                'max_tokens' => 32,
-                'messages'   => array(array('role' => 'user', 'content' => $prompt)),
-            ));
-            if (is_wp_error($response)) {
-                return new WP_Error('zen_cortext_api', $response->get_error_message());
-            }
-            $text = isset($response['content'][0]['text']) ? $response['content'][0]['text'] : '';
-        }
-
+        $text = self::complete_text($prompt, array(
+            'model'      => self::classify_model(),
+            'max_tokens' => 32,
+            'timeout'    => 90,
+        ));
         if (is_wp_error($text)) {
             return new WP_Error('zen_cortext_api', $text->get_error_message());
         }
@@ -301,21 +292,13 @@ class Zen_Cortext_API {
 
         $prompt = $prompts[$classification] . "\n\n---\n\nINPUT:\nTitle: " . $title . "\n\n" . $content;
 
-        if (self::processor() === 'cli') {
-            $text = self::cli_request($prompt, 180);
-            if (is_wp_error($text)) {
-                return new WP_Error('zen_cortext_api', $text->get_error_message());
-            }
-        } else {
-            $response = self::request_json(array(
-                'model'      => self::model(),
-                'max_tokens' => self::max_tokens(),
-                'messages'   => array(array('role' => 'user', 'content' => $prompt)),
-            ));
-            if (is_wp_error($response)) {
-                return new WP_Error('zen_cortext_api', $response->get_error_message());
-            }
-            $text = isset($response['content'][0]['text']) ? $response['content'][0]['text'] : '';
+        $text = self::complete_text($prompt, array(
+            'model'      => self::model(),
+            'max_tokens' => self::max_tokens(),
+            'timeout'    => 180,
+        ));
+        if (is_wp_error($text)) {
+            return new WP_Error('zen_cortext_api', $text->get_error_message());
         }
 
         $text = trim((string) $text);
@@ -345,21 +328,13 @@ class Zen_Cortext_API {
 
         $prompt = $template . "\n\n---\n\nINPUT:\nTitle: " . $title . "\n\n" . $raw_content;
 
-        if (self::processor() === 'cli') {
-            $text = self::cli_request($prompt, 180);
-            if (is_wp_error($text)) {
-                return new WP_Error('zen_cortext_api', $text->get_error_message());
-            }
-        } else {
-            $response = self::request_json(array(
-                'model'      => self::model(),
-                'max_tokens' => self::max_tokens(),
-                'messages'   => array(array('role' => 'user', 'content' => $prompt)),
-            ));
-            if (is_wp_error($response)) {
-                return new WP_Error('zen_cortext_api', $response->get_error_message());
-            }
-            $text = isset($response['content'][0]['text']) ? $response['content'][0]['text'] : '';
+        $text = self::complete_text($prompt, array(
+            'model'      => self::model(),
+            'max_tokens' => self::max_tokens(),
+            'timeout'    => 180,
+        ));
+        if (is_wp_error($text)) {
+            return new WP_Error('zen_cortext_api', $text->get_error_message());
         }
 
         $text = trim((string) $text);
@@ -414,21 +389,13 @@ class Zen_Cortext_API {
             $prompt .= "\n\n" . $reference_block;
         }
 
-        if (self::processor() === 'cli') {
-            $text = self::cli_request($prompt, 180);
-            if (is_wp_error($text)) {
-                return new WP_Error('zen_cortext_api', $text->get_error_message());
-            }
-        } else {
-            $response = self::request_json(array(
-                'model'      => self::model(),
-                'max_tokens' => self::max_tokens(),
-                'messages'   => array(array('role' => 'user', 'content' => $prompt)),
-            ));
-            if (is_wp_error($response)) {
-                return new WP_Error('zen_cortext_api', $response->get_error_message());
-            }
-            $text = isset($response['content'][0]['text']) ? $response['content'][0]['text'] : '';
+        $text = self::complete_text($prompt, array(
+            'model'      => self::model(),
+            'max_tokens' => self::max_tokens(),
+            'timeout'    => 180,
+        ));
+        if (is_wp_error($text)) {
+            return new WP_Error('zen_cortext_api', $text->get_error_message());
         }
 
         $text = trim((string) $text);
@@ -483,22 +450,12 @@ class Zen_Cortext_API {
             if (ob_get_level()) { @ob_flush(); }
             @flush();
         };
-        if (self::processor() === 'cli') {
-            self::stream_chat_via_cli(
-                $system,
-                $full_messages,
-                self::cli_model(),
-                $on_event,
-                array('timeout' => 180)
-            );
-        } else {
-            self::stream_chat_via_api(
-                $system,
-                $full_messages,
-                $on_event,
-                array('timeout' => 180)
-            );
-        }
+        self::stream_internal(
+            $system,
+            $full_messages,
+            $on_event,
+            array('timeout' => 180)
+        );
     }
 
     /**
@@ -638,6 +595,22 @@ class Zen_Cortext_API {
             return;
         }
 
+        // Keep generating + persisting even if the visitor disconnects mid-
+        // stream. Low-quality CPC / bot ad clicks routinely fire a prefilled
+        // starter chip then bounce before Sonnet returns its first token.
+        // Without this, the flush() to the dead socket aborted the script
+        // BEFORE the post-stream persist/error block — leaving the chat with
+        // only the user turn, no assistant answer, and no logged error.
+        // ignore_user_abort keeps PHP alive past the disconnect so the answer
+        // still streams to completion and lands in the DB (the visitor can
+        // resume/replay it). set_time_limit(0) prevents a max_execution_time
+        // kill on long generations (curl itself caps at 120s below).
+        ignore_user_abort(true);
+        if (function_exists('set_time_limit')) {
+            // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- the visitor chat is a long-lived Server-Sent Events stream; without lifting max_execution_time PHP kills the request mid-generation. Guarded by function_exists() and the request is already a dedicated streaming endpoint.
+            @set_time_limit(0);
+        }
+
         // Persist what we have so far (before streaming) so we capture even
         // sessions that bail out mid-response. owner_token is stored once,
         // on first insert, so handle_send() can refuse later writes from
@@ -748,6 +721,13 @@ class Zen_Cortext_API {
         $assistant_buffer = '';
         $sse_tail = '';
 
+        // Captures an in-stream `error` event from a 200 response. Anthropic
+        // can return HTTP 200 and then emit `event: error` (e.g. overloaded_error)
+        // mid-stream instead of any text. The status-line + error_body checks
+        // never see it (status is 200, the body isn't buffered), so we pull the
+        // reason out here to feed the empty-stream failure branch below.
+        $stream_error = '';
+
         // HTTP status + error-body buffering. The visitor stream is piped
         // straight through CURLOPT_WRITEFUNCTION — when Anthropic returns
         // a 4xx (insufficient credits, rate limit, invalid key, …) the
@@ -757,67 +737,76 @@ class Zen_Cortext_API {
         $response_status = 0;
         $error_body      = '';
 
-        $ch = curl_init(self::ENDPOINT);
-        curl_setopt_array($ch, array(
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => array(
-                'Content-Type: application/json',
-                'x-api-key: ' . self::api_key(),
-                'anthropic-version: ' . self::ANTHROPIC_VERSION,
-            ),
-            CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$response_status) {
-                // Each response can have multiple status lines (redirects);
-                // the last one wins. Parse "HTTP/1.1 429 Too Many Requests".
-                if (preg_match('#^HTTP/\S+\s+(\d{3})\b#', $header, $m)) {
-                    $response_status = (int) $m[1];
-                }
-                return strlen($header);
-            },
-            CURLOPT_WRITEFUNCTION  => function($ch, $data) use (&$assistant_buffer, &$sse_tail, &$error_body, &$response_status, $chat_uid) {
-                // 4xx/5xx: do NOT pass-through to the visitor. Buffer the
-                // body so the post-exec block can extract a clean message
-                // and email the admin instead of leaking JSON to the chat.
-                if ($response_status >= 400) {
-                    $error_body .= $data;
-                    return strlen($data);
-                }
+        // Stream the Anthropic SSE response through the WordPress HTTP API.
+        // The read callbacks are attached to the cURL handle via
+        // http_api_curl (see http_stream_post) so each chunk reaches the
+        // browser the instant it arrives.
+        $streamed  = false;
+        $header_cb = function ($handle, $header) use (&$response_status) {
+            // Each response can have multiple status lines (redirects);
+            // the last one wins. Parse "HTTP/1.1 429 Too Many Requests".
+            if (preg_match('#^HTTP/\S+\s+(\d{3})\b#', $header, $m)) {
+                $response_status = (int) $m[1];
+            }
+            return strlen($header);
+        };
+        $write_cb = function ($handle, $data) use (&$assistant_buffer, &$sse_tail, &$error_body, &$stream_error, &$response_status, &$streamed, $chat_uid) {
+            $streamed = true;
+            // 4xx/5xx: do NOT pass-through to the visitor. Buffer the
+            // body so the post-request block can extract a clean message
+            // and email the admin instead of leaking JSON to the chat.
+            if ($response_status >= 400) {
+                $error_body .= $data;
+                return strlen($data);
+            }
 
-                // Happy path: pass straight to the client.
-                // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $data is a raw SSE chunk from Anthropic streamed through verbatim; escaping would corrupt the protocol.
-                echo $data;
-                if (ob_get_level()) { @ob_flush(); }
-                @flush();
+            // Happy path: pass straight to the client.
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $data is a raw SSE chunk from Anthropic streamed through verbatim; escaping would corrupt the protocol.
+            echo $data;
+            if (ob_get_level()) { @ob_flush(); }
+            @flush();
 
-                // Server-side parse of the SSE stream so we can persist the
-                // assistant's full text after it finishes. Only when we're
-                // saving (chat_uid present) — otherwise it's wasted work.
-                if ($chat_uid !== '') {
-                    $sse_tail .= $data;
-                    while (($pos = strpos($sse_tail, "\n")) !== false) {
-                        $line = substr($sse_tail, 0, $pos);
-                        $sse_tail = substr($sse_tail, $pos + 1);
-                        $line = rtrim($line, "\r");
-                        if (strpos($line, 'data: ') !== 0) continue;
-                        $json = substr($line, 6);
-                        if ($json === '' || $json === '[DONE]') continue;
-                        $event = json_decode($json, true);
-                        if (!is_array($event)) continue;
-                        if (
-                            isset($event['type']) && $event['type'] === 'content_block_delta' &&
-                            isset($event['delta']['text'])
-                        ) {
-                            $assistant_buffer .= $event['delta']['text'];
-                        }
+            // Server-side parse of the SSE stream so we can persist the
+            // assistant's full text after it finishes. Only when we're
+            // saving (chat_uid present) — otherwise it's wasted work.
+            if ($chat_uid !== '') {
+                $sse_tail .= $data;
+                while (($pos = strpos($sse_tail, "\n")) !== false) {
+                    $line = substr($sse_tail, 0, $pos);
+                    $sse_tail = substr($sse_tail, $pos + 1);
+                    $line = rtrim($line, "\r");
+                    if (strpos($line, 'data: ') !== 0) continue;
+                    $json = substr($line, 6);
+                    if ($json === '' || $json === '[DONE]') continue;
+                    $event = json_decode($json, true);
+                    if (!is_array($event)) continue;
+                    if (
+                        isset($event['type']) && $event['type'] === 'content_block_delta' &&
+                        isset($event['delta']['text'])
+                    ) {
+                        $assistant_buffer .= $event['delta']['text'];
+                    } elseif (isset($event['type']) && $event['type'] === 'error') {
+                        // 200 + in-stream error (overloaded_error, etc.).
+                        $stream_error = isset($event['error']['message'])
+                            ? (string) $event['error']['message']
+                            : (isset($event['error']['type']) ? (string) $event['error']['type'] : 'unknown stream error');
                     }
                 }
+            }
 
-                return strlen($data);
-            },
-            CURLOPT_TIMEOUT        => 120,
-        ));
+            return strlen($data);
+        };
 
-        curl_exec($ch);
+        $response = self::http_stream_post($payload, 120, $header_cb, $write_cb);
+
+        // Fallback: on hosts where WP did not use the cURL transport the
+        // callbacks never fired — replay the buffered body through the same
+        // handler so the visitor still gets the full reply (just not chunked).
+        if (!is_wp_error($response) && !$streamed) {
+            $response_status = (int) wp_remote_retrieve_response_code($response);
+            $buffered = (string) wp_remote_retrieve_body($response);
+            if ($buffered !== '') { $write_cb(null, $buffered); }
+        }
 
         // Detect every failure path: transport (curl_errno), bad HTTP
         // status, or success that produced no assistant text. Each one
@@ -827,10 +816,28 @@ class Zen_Cortext_API {
         // outages immediately. Without this, errors used to either echo
         // raw JSON to the chat or silently produce an empty bubble.
         $service_error_msg = '';
-        if (curl_errno($ch)) {
-            $service_error_msg = 'transport: ' . curl_error($ch);
+        if (is_wp_error($response) && !$streamed) {
+            // A genuine transport failure: we couldn't connect / nothing was
+            // streamed. (When the stream DID run, the WP HTTP API's Requests
+            // layer can still return a WP_Error like "Missing header/body
+            // separator" — because our CURLOPT_WRITEFUNCTION already consumed
+            // the body, leaving Requests nothing to re-parse. That is NOT a
+            // failure: the visitor got the full streamed answer, so we ignore
+            // it and fall through to the status / empty-text checks below.)
+            $service_error_msg = 'transport: ' . $response->get_error_message();
         } elseif ($response_status >= 400) {
             $service_error_msg = 'Anthropic ' . $response_status . ': ' . self::extract_anthropic_error_message($error_body, $response_status);
+        } elseif ($chat_uid !== '' && $assistant_buffer === '') {
+            // HTTP 200 (or no status at all) but zero assistant text. Anthropic
+            // delivers some failures — overloaded_error, an in-stream `error`
+            // event, an empty stream — as a 200 whose body carries no
+            // content_block_delta. The two checks above miss it entirely, so
+            // it used to leave a silent dead bubble: no fallback, no admin
+            // email, no log, nothing persisted. Surface it like any other
+            // outage. Prefer the in-stream `error` event reason captured during
+            // parsing; on a truly empty 200 fall back to a generic message.
+            $reason = $stream_error !== '' ? $stream_error : 'no assistant text in response';
+            $service_error_msg = 'empty stream (HTTP ' . ($response_status ?: 200) . '): ' . $reason;
         }
 
         if ($service_error_msg !== '') {
@@ -852,8 +859,6 @@ class Zen_Cortext_API {
             @flush();
         }
 
-        curl_close($ch);
-
         // After streaming: persist the full conversation including the
         // assistant's response so the saved chat is complete even if the
         // visitor bails before sending another message.
@@ -874,6 +879,54 @@ class Zen_Cortext_API {
             $final_messages[] = array('role' => 'assistant', 'content' => $assistant_buffer);
             Zen_Cortext_Chats::set_messages_by_uid($chat_uid, $final_messages);
         }
+    }
+
+    /**
+     * POST $payload to the Anthropic streaming endpoint through the
+     * WordPress HTTP API (wp_remote_post). To consume the SSE body live —
+     * chunk-by-chunk as it arrives — we attach $header_cb / $write_cb to the
+     * underlying cURL handle via the http_api_curl action, which fires right
+     * before curl_exec() so our setopt wins over WP_Http_Curl's own buffering
+     * callbacks. (A cURL handle is an object/resource, so the handle passed
+     * to the action points at the same session — no by-reference needed.)
+     *
+     * Returns the wp_remote_post() result (array on success, WP_Error on a
+     * transport failure). On hosts where WP is NOT using the cURL transport
+     * the callbacks never fire; the caller detects that (its own "streamed"
+     * flag stays false) and replays wp_remote_retrieve_body() through the
+     * same handler — correct, just not chunked.
+     *
+     * @param string   $payload   JSON request body.
+     * @param int      $timeout   Request timeout in seconds.
+     * @param callable $header_cb function($handle, $header_line): int
+     * @param callable $write_cb  function($handle, $chunk): int
+     * @return array|WP_Error
+     */
+    private static function http_stream_post($payload, $timeout, $header_cb, $write_cb) {
+        $attach = function ($handle) use ($header_cb, $write_cb) {
+            if (function_exists('curl_setopt')) {
+                curl_setopt($handle, CURLOPT_HEADERFUNCTION, $header_cb);
+                curl_setopt($handle, CURLOPT_WRITEFUNCTION, $write_cb);
+            }
+        };
+        add_action('http_api_curl', $attach);
+        try {
+            $response = wp_remote_post(self::ENDPOINT, array(
+                'method'      => 'POST',
+                'httpversion' => '1.1',
+                'timeout'     => (int) $timeout,
+                'blocking'    => true,
+                'headers'     => array(
+                    'Content-Type'      => 'application/json',
+                    'x-api-key'         => self::api_key(),
+                    'anthropic-version' => self::ANTHROPIC_VERSION,
+                ),
+                'body'        => $payload,
+            ));
+        } finally {
+            remove_action('http_api_curl', $attach);
+        }
+        return $response;
     }
 
     /**
@@ -933,57 +986,62 @@ class Zen_Cortext_API {
         $assistant_buffer = '';
         $sse_tail         = '';
 
-        $ch = curl_init(self::ENDPOINT);
-        curl_setopt_array($ch, array(
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => array(
-                'Content-Type: application/json',
-                'x-api-key: ' . self::api_key(),
-                'anthropic-version: ' . self::ANTHROPIC_VERSION,
-            ),
-            CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$response_status) {
-                if ($response_status === 0 && preg_match('#^HTTP/\S+\s+(\d+)#', $header, $m)) {
-                    $response_status = (int) $m[1];
-                }
-                return strlen($header);
-            },
-            CURLOPT_WRITEFUNCTION  => function ($ch, $data) use (&$response_status, &$error_body, &$assistant_buffer, &$sse_tail, $on_event) {
-                if ($response_status >= 400) {
-                    // Buffer the JSON error body and surface it cleanly after curl finishes.
-                    $error_body .= $data;
-                    return strlen($data);
-                }
-                // Forward each complete SSE "data:" line to the callback in
-                // the same shape stream_chat_via_cli emits, so handlers don't
-                // have to care which path served them.
-                $sse_tail .= $data;
-                while (($pos = strpos($sse_tail, "\n")) !== false) {
-                    $line     = substr($sse_tail, 0, $pos);
-                    $sse_tail = substr($sse_tail, $pos + 1);
-                    $line     = rtrim($line, "\r");
-                    if (strpos($line, 'data: ') !== 0) continue;
-                    $json = substr($line, 6);
-                    if ($json === '' || $json === '[DONE]') continue;
-                    $event = json_decode($json, true);
-                    if (!is_array($event)) continue;
-                    $on_event(wp_json_encode($event));
-                    if (
-                        isset($event['type'], $event['delta']['type'], $event['delta']['text']) &&
-                        $event['type']         === 'content_block_delta' &&
-                        $event['delta']['type'] === 'text_delta'
-                    ) {
-                        $assistant_buffer .= $event['delta']['text'];
-                    }
-                }
+        // Stream via the WordPress HTTP API; read callbacks are attached to
+        // the cURL handle through http_api_curl (see http_stream_post).
+        $streamed  = false;
+        $header_cb = function ($handle, $header) use (&$response_status) {
+            if ($response_status === 0 && preg_match('#^HTTP/\S+\s+(\d+)#', $header, $m)) {
+                $response_status = (int) $m[1];
+            }
+            return strlen($header);
+        };
+        $write_cb = function ($handle, $data) use (&$response_status, &$error_body, &$assistant_buffer, &$sse_tail, &$streamed, $on_event) {
+            $streamed = true;
+            if ($response_status >= 400) {
+                // Buffer the JSON error body and surface it cleanly afterwards.
+                $error_body .= $data;
                 return strlen($data);
-            },
-            CURLOPT_TIMEOUT        => $timeout,
-        ));
-        curl_exec($ch);
+            }
+            // Forward each complete SSE "data:" line to the callback in
+            // the same shape stream_chat_via_cli emits, so handlers don't
+            // have to care which path served them.
+            $sse_tail .= $data;
+            while (($pos = strpos($sse_tail, "\n")) !== false) {
+                $line     = substr($sse_tail, 0, $pos);
+                $sse_tail = substr($sse_tail, $pos + 1);
+                $line     = rtrim($line, "\r");
+                if (strpos($line, 'data: ') !== 0) continue;
+                $json = substr($line, 6);
+                if ($json === '' || $json === '[DONE]') continue;
+                $event = json_decode($json, true);
+                if (!is_array($event)) continue;
+                $on_event(wp_json_encode($event));
+                if (
+                    isset($event['type'], $event['delta']['type'], $event['delta']['text']) &&
+                    $event['type']         === 'content_block_delta' &&
+                    $event['delta']['type'] === 'text_delta'
+                ) {
+                    $assistant_buffer .= $event['delta']['text'];
+                }
+            }
+            return strlen($data);
+        };
 
-        if (curl_errno($ch)) {
-            $on_event(wp_json_encode(array('type' => 'error', 'error' => curl_error($ch))));
+        $response = self::http_stream_post($payload, $timeout, $header_cb, $write_cb);
+
+        // Fallback for hosts not using the cURL transport: replay the
+        // buffered body through the same handler.
+        if (!is_wp_error($response) && !$streamed) {
+            $response_status = (int) wp_remote_retrieve_response_code($response);
+            $buffered = (string) wp_remote_retrieve_body($response);
+            if ($buffered !== '') { $write_cb(null, $buffered); }
+        }
+
+        if (is_wp_error($response) && !$streamed) {
+            // Genuine transport failure (nothing streamed). A WP_Error AFTER a
+            // successful stream is just Requests failing to re-parse the body
+            // our CURLOPT_WRITEFUNCTION already consumed — not a real error.
+            $on_event(wp_json_encode(array('type' => 'error', 'error' => $response->get_error_message())));
         } elseif ($response_status >= 400) {
             $msg = self::extract_anthropic_error_message($error_body, $response_status);
             // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostic only; gated on operational error paths to land in the WP debug.log when WP_DEBUG_LOG is on.
@@ -993,7 +1051,6 @@ class Zen_Cortext_API {
                 'error' => 'Anthropic ' . $response_status . ': ' . $msg,
             )));
         }
-        curl_close($ch);
 
         return array(
             'ok'     => $assistant_buffer !== '',
@@ -1169,324 +1226,6 @@ class Zen_Cortext_API {
             529 => 'Overloaded',
         );
         return isset($map[$status]) ? $map[$status] : 'HTTP error';
-    }
-
-    /**
-     * Stream a chat through the Claude Code CLI in stream-json mode and
-     * forward each event to a caller-provided callback. The callback is
-     * called with a JSON string that the caller wraps as an SSE
-     * "data: ...\n\n" line for the browser.
-     *
-     * Why this exists: keeps internal AI features (Brainstorm, AI Helper,
-     * Artifact builder chat) on the user's Max-subscription CLI quota
-     * instead of the per-token Anthropic API. The visitor chat stays on
-     * the API path because its key is exposed via the public REST endpoint
-     * and can't share the server's CLI auth.
-     *
-     * The system context is embedded into the user prompt body (passed via
-     * stdin file) rather than --append-system-prompt, because a 200KB+
-     * system block would blow shell argv limits. Claude Code wraps its own
-     * agent system prompt around our payload, but the model follows the
-     * explicit instructions inside our payload.
-     *
-     * Returns ['ok' => bool, 'text' => string, 'stderr' => string].
-     */
-    public static function stream_chat_via_cli($system_prompt, $messages, $model_alias, $on_event, $opts = array()) {
-        $bin = self::cli_path();
-        if ($bin === '') {
-            $on_event(wp_json_encode(array('type' => 'error', 'error' => 'CLI path is not configured.')));
-            return array('ok' => false, 'text' => '', 'stderr' => '');
-        }
-        if (!function_exists('proc_open')) {
-            $on_event(wp_json_encode(array('type' => 'error', 'error' => 'proc_open() is disabled — CLI mode unavailable.')));
-            return array('ok' => false, 'text' => '', 'stderr' => '');
-        }
-
-        $timeout = isset($opts['timeout']) ? (int) $opts['timeout'] : 300;
-        $prompt  = self::compose_cli_prompt($system_prompt, $messages);
-
-        $tmpfile = tempnam(sys_get_temp_dir(), 'zc_cli_chat_');
-        if ($tmpfile === false) {
-            $on_event(wp_json_encode(array('type' => 'error', 'error' => 'Could not create tmp file for prompt.')));
-            return array('ok' => false, 'text' => '', 'stderr' => '');
-        }
-        if (file_put_contents($tmpfile, $prompt) === false) {
-            @unlink($tmpfile);
-            $on_event(wp_json_encode(array('type' => 'error', 'error' => 'Could not write prompt tmp file.')));
-            return array('ok' => false, 'text' => '', 'stderr' => '');
-        }
-
-        $cmd = 'cat ' . escapeshellarg($tmpfile)
-             . ' | ' . escapeshellcmd($bin)
-             . ' --print --output-format stream-json --include-partial-messages --verbose'
-             . ' --model ' . escapeshellarg($model_alias);
-
-        $descriptors = array(
-            0 => array('pipe', 'r'),
-            1 => array('pipe', 'w'),
-            2 => array('pipe', 'w'),
-        );
-        $proc = @proc_open($cmd, $descriptors, $pipes);
-        if (!is_resource($proc)) {
-            @unlink($tmpfile);
-            $on_event(wp_json_encode(array('type' => 'error', 'error' => 'Failed to launch CLI: ' . $bin)));
-            return array('ok' => false, 'text' => '', 'stderr' => '');
-        }
-        fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-
-        $stdout_buf     = '';
-        $stderr_buf     = '';
-        $assistant_text = '';
-        $start          = time();
-        $emitted_meta   = false;
-        $last_flush_at  = microtime(true);
-        // Heartbeat every 5s of silence — well under FrankenPHP/Caddy's
-        // default ~30s idle SSE timeout. Without this the proxy drops the
-        // stream while Opus is thinking before producing first text on
-        // long prompts ("Stream error: network error" client-side).
-        $heartbeat_every = 5.0;
-
-        // Drain loop. stream_select() blocks for at most 250ms per cycle so
-        // we don't busy-loop, but we still wake up promptly when a chunk
-        // arrives — that's what gives the brainstorm UI its live feel.
-        while (true) {
-            $status = proc_get_status($proc);
-
-            $read   = array($pipes[1], $pipes[2]);
-            $write  = null;
-            $except = null;
-            @stream_select($read, $write, $except, 0, 250000);
-
-            $chunk_out = stream_get_contents($pipes[1]);
-            $chunk_err = stream_get_contents($pipes[2]);
-            if ($chunk_out !== false && $chunk_out !== '') $stdout_buf .= $chunk_out;
-            if ($chunk_err !== false && $chunk_err !== '') $stderr_buf .= $chunk_err;
-
-            // Process complete lines.
-            $forwarded_anything = false;
-            while (($pos = strpos($stdout_buf, "\n")) !== false) {
-                $line       = substr($stdout_buf, 0, $pos);
-                $stdout_buf = substr($stdout_buf, $pos + 1);
-                $line       = rtrim($line, "\r");
-                if ($line === '') continue;
-                self::process_cli_line($line, $on_event, $assistant_text, $emitted_meta);
-                $forwarded_anything = true;
-            }
-            if ($forwarded_anything) {
-                $last_flush_at = microtime(true);
-            } elseif (microtime(true) - $last_flush_at >= $heartbeat_every) {
-                // SSE comment line — clients ignore lines starting with ':',
-                // proxies see traffic and keep the connection alive. Doesn't
-                // go through $on_event because it's not an event payload.
-                echo ": heartbeat\n\n";
-                if (ob_get_level()) @ob_flush();
-                @flush();
-                $last_flush_at = microtime(true);
-            }
-
-            if (!$status['running']) {
-                // Final drain after process exit.
-                $tail_out = stream_get_contents($pipes[1]);
-                $tail_err = stream_get_contents($pipes[2]);
-                if ($tail_out !== false) $stdout_buf .= $tail_out;
-                if ($tail_err !== false) $stderr_buf .= $tail_err;
-                while (($pos = strpos($stdout_buf, "\n")) !== false) {
-                    $line       = substr($stdout_buf, 0, $pos);
-                    $stdout_buf = substr($stdout_buf, $pos + 1);
-                    $line       = rtrim($line, "\r");
-                    if ($line === '') continue;
-                    self::process_cli_line($line, $on_event, $assistant_text, $emitted_meta);
-                }
-                $exit_code = (int) $status['exitcode'];
-                if ($exit_code !== 0 && $assistant_text === '') {
-                    $err = trim($stderr_buf);
-                    if ($err === '') $err = 'CLI exited with code ' . $exit_code;
-                    $on_event(wp_json_encode(array('type' => 'error', 'error' => 'CLI: ' . $err)));
-                }
-                break;
-            }
-
-            if (time() - $start > $timeout) {
-                @proc_terminate($proc, 15); // SIGTERM
-                $on_event(wp_json_encode(array('type' => 'error', 'error' => 'CLI timeout after ' . $timeout . 's')));
-                break;
-            }
-        }
-
-        @fclose($pipes[1]);
-        @fclose($pipes[2]);
-        @proc_close($proc);
-        @unlink($tmpfile);
-
-        return array(
-            'ok'     => $assistant_text !== '',
-            'text'   => $assistant_text,
-            'stderr' => $stderr_buf,
-        );
-    }
-
-    /**
-     * Parse one line of CLI stream-json output and forward as SSE if it's a
-     * useful event. Mutates $assistant_text by reference so the caller can
-     * persist the final transcript.
-     *
-     * Forwarded event shapes (Anthropic-style, identical to what the API
-     * path emits, so the existing JS consumer needs no changes):
-     *   - message_start, content_block_start, content_block_delta,
-     *     content_block_stop, message_delta, message_stop  (from stream_event wrapper)
-     *   - chat_meta { chat_uid }  (synthesised from the CLI's session_id, once per stream)
-     *   - error  (on parse / CLI failure)
-     */
-    private static function process_cli_line($line, $on_event, &$assistant_text, &$emitted_meta) {
-        $event = json_decode($line, true);
-        if (!is_array($event) || !isset($event['type'])) return;
-
-        // CLI wraps Anthropic SSE events inside stream_event. Unwrap and
-        // forward — the frontend already speaks this dialect.
-        if ($event['type'] === 'stream_event' && isset($event['event']) && is_array($event['event'])) {
-            $sub = $event['event'];
-            $on_event(wp_json_encode($sub));
-            // Tail the assistant text for server-side persistence.
-            if (
-                isset($sub['type'], $sub['delta']['type'], $sub['delta']['text']) &&
-                $sub['type']             === 'content_block_delta' &&
-                $sub['delta']['type']     === 'text_delta'
-            ) {
-                $assistant_text .= $sub['delta']['text'];
-            }
-            return;
-        }
-
-        // Final result event — surface usage/cost so the UI's token line
-        // works the same as on the API path.
-        if ($event['type'] === 'result' && isset($event['usage'])) {
-            $on_event(wp_json_encode(array(
-                'type'  => 'message_delta',
-                'usage' => $event['usage'],
-            )));
-            return;
-        }
-
-        // System init event — could surface session_id but we don't need it.
-        // Rate limit / init events are intentionally swallowed.
-    }
-
-    /**
-     * Build the single prompt text passed to the CLI via stdin. Embeds the
-     * system context inline (because --append-system-prompt would exceed
-     * shell argv limits at our typical size) plus the conversation history
-     * with role markers.
-     */
-    private static function compose_cli_prompt($system_prompt, $messages) {
-        $out  = "<system_context>\n";
-        $out .= "This is your operating context for the response that follows. Treat it as your system prompt: read it, follow its rules, and do not echo it back to the user.\n\n";
-        $out .= trim((string) $system_prompt);
-        $out .= "\n</system_context>\n\n";
-        $out .= "<conversation>\n";
-        foreach ($messages as $m) {
-            if (!is_array($m)) continue;
-            if (empty($m['role']) || empty($m['content'])) continue;
-            $role    = ($m['role'] === 'assistant') ? 'ASSISTANT' : 'USER';
-            $content = (string) $m['content'];
-            $out    .= "<{$role}>\n" . $content . "\n</{$role}>\n\n";
-        }
-        $out .= "</conversation>\n\n";
-        $out .= "Respond as the assistant continuing the conversation above. Follow every rule in <system_context>. Output only your reply — no role labels, no preamble, no quoting of the system context, no XML tags.\n";
-        return $out;
-    }
-
-    /**
-     * Run the Claude Code CLI with a given prompt and return stdout.
-     *
-     * Strategy: write the prompt to a temp file, then run `cat tmpfile | claude ...`
-     * via a shell. Direct proc_open stdin pipes proved unreliable with the Claude CLI
-     * (it reported "Input must be provided either through stdin or as a prompt argument"
-     * even though data was written to the stdin pipe). Shell pipe redirection from a
-     * real file works reliably for prompts of any size.
-     *
-     * Uses proc_open so we can enforce a timeout.
-     */
-    private static function cli_request($prompt, $timeout_sec = 90) {
-        if (!function_exists('proc_open')) {
-            return new WP_Error('zen_cortext_cli', 'proc_open() is disabled on this server. CLI mode unavailable.');
-        }
-
-        $bin   = self::cli_path();
-        $model = self::cli_model();
-        if ($bin === '') {
-            return new WP_Error('zen_cortext_cli', 'CLI path is empty.');
-        }
-
-        $tmpfile = tempnam(sys_get_temp_dir(), 'zen_cortext_cli_');
-        if ($tmpfile === false) {
-            return new WP_Error('zen_cortext_cli', 'Could not create tmp file for prompt.');
-        }
-        file_put_contents($tmpfile, (string) $prompt);
-
-        // Shell pipe: cat tmpfile | claude --print --model X
-        $shell_cmd = 'cat ' . escapeshellarg($tmpfile)
-                   . ' | ' . escapeshellcmd($bin)
-                   . ' --print --model ' . escapeshellarg($model);
-
-        $descriptors = array(
-            0 => array('pipe', 'r'),
-            1 => array('pipe', 'w'),
-            2 => array('pipe', 'w'),
-        );
-
-        $proc = @proc_open($shell_cmd, $descriptors, $pipes, null, null);
-        if (!is_resource($proc)) {
-            @unlink($tmpfile);
-            return new WP_Error('zen_cortext_cli', "Failed to launch CLI: {$bin}");
-        }
-
-        // We don't need to write anything to stdin — shell handles redirection.
-        fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-
-        $stdout = '';
-        $stderr = '';
-        $start  = time();
-        $exit   = null;
-
-        while (true) {
-            $status = proc_get_status($proc);
-            $stdout .= stream_get_contents($pipes[1]);
-            $stderr .= stream_get_contents($pipes[2]);
-
-            if (!$status['running']) {
-                $exit = (int) $status['exitcode'];
-                $stdout .= stream_get_contents($pipes[1]);
-                $stderr .= stream_get_contents($pipes[2]);
-                break;
-            }
-
-            if ((time() - $start) > $timeout_sec) {
-                proc_terminate($proc, 9);
-                fclose($pipes[1]);
-                fclose($pipes[2]);
-                proc_close($proc);
-                @unlink($tmpfile);
-                return new WP_Error('zen_cortext_cli', "CLI timed out after {$timeout_sec}s");
-            }
-
-            usleep(50000); // 50ms
-        }
-
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        proc_close($proc);
-        @unlink($tmpfile);
-
-        if ($exit !== 0) {
-            $msg = trim($stderr ?: $stdout);
-            return new WP_Error('zen_cortext_cli', "CLI exited with code {$exit}: " . substr($msg, 0, 400));
-        }
-
-        return $stdout;
     }
 
     /**

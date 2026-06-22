@@ -1,0 +1,52 @@
+/*
+ * Zen Cortext admin — API Docs page
+ * Moved out of an inline <style> block into an enqueued stylesheet.
+ */
+
+.zcdocs .zcdocs-layout { display: grid; grid-template-columns: 240px 1fr; gap: 32px; margin-top: 16px; }
+.zcdocs .zcdocs-toc {
+    position: sticky; top: 50px; align-self: start;
+    border-left: 3px solid #2271b1; padding: 4px 0 4px 14px;
+    font-size: 13px; max-height: calc(100vh - 80px); overflow-y: auto;
+}
+.zcdocs .zcdocs-toc strong { display: block; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; color: #50575e; margin-bottom: 6px; }
+.zcdocs .zcdocs-toc ul    { list-style: none; margin: 0; padding: 0; }
+.zcdocs .zcdocs-toc ul ul { padding-left: 14px; margin: 2px 0 6px; font-size: 12px; }
+.zcdocs .zcdocs-toc a     { display: block; padding: 2px 0; text-decoration: none; color: #2271b1; }
+.zcdocs .zcdocs-toc a:hover { text-decoration: underline; }
+
+.zcdocs .zcdocs-content section { padding: 8px 0 24px; border-bottom: 1px solid #e0e0e0; margin-bottom: 16px; }
+.zcdocs .zcdocs-content section:last-child { border-bottom: none; }
+.zcdocs .zcdocs-content h2 { margin-top: 24px; padding-top: 8px; }
+.zcdocs .zcdocs-content h3 { margin-top: 18px; }
+
+.zcdocs pre {
+    background: #1d2327; color: #e6e6e6; padding: 12px 14px;
+    border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5;
+    max-width: 100%;
+}
+.zcdocs pre code { color: inherit; background: none; padding: 0; font-size: inherit; }
+.zcdocs code     { background: #f0f0f1; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+.zcdocs .zcdocs-meta { border-collapse: collapse; margin: 8px 0 16px; }
+.zcdocs .zcdocs-meta th, .zcdocs .zcdocs-meta td { text-align: left; vertical-align: top; padding: 6px 10px; border-bottom: 1px solid #e0e0e0; }
+.zcdocs .zcdocs-meta th { width: 130px; color: #50575e; font-weight: 600; }
+
+.zcdocs .zcdocs-table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 13px; }
+.zcdocs .zcdocs-table th, .zcdocs .zcdocs-table td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid #e0e0e0; }
+.zcdocs .zcdocs-table th { background: #f6f7f7; font-weight: 600; }
+
+.zcdocs .zcdocs-endpoint { background: #fbfcfd; border: 1px solid #e0e0e0; border-radius: 4px; padding: 14px 16px; margin: 14px 0; }
+.zcdocs .zcdocs-endpoint h3 { margin-top: 0; }
+.zcdocs .zcdocs-scope {
+    display: inline-block; margin-left: 8px;
+    background: #f0f6fc; color: #2271b1; border: 1px solid #c3d9ee;
+    padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; vertical-align: middle;
+}
+
+.zcdocs .zcdocs-note { background: #fcf9e8; border-left: 4px solid #dba617; padding: 10px 14px; margin: 8px 0; font-size: 13px; }
+
+@media (max-width: 900px) {
+    .zcdocs .zcdocs-layout { grid-template-columns: 1fr; }
+    .zcdocs .zcdocs-toc { position: static; max-height: none; }
+}

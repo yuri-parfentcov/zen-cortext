@@ -14,8 +14,10 @@ self.addEventListener('push', function (event) {
     event.waitUntil(
         self.registration.showNotification(data.title || 'Zen Cortext', {
             body: data.body || '',
-            icon: '/biometrics.png',
-            badge: '/biometrics.png',
+            // Icon URL comes from the server push payload (a portable plugin
+            // URL); omitted → the browser falls back to its default icon.
+            icon: data.icon || undefined,
+            badge: data.badge || data.icon || undefined,
             tag: data.tag || 'zen-livechat',
             renotify: true,
             data: { url: data.url || '/zen-livechat/' }

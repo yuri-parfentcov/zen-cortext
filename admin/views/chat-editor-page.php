@@ -218,7 +218,7 @@ if (!defined('ABSPATH')) exit;
             );
             ?></li>
             <li><?php esc_html_e('Click Save Colors → values stored in the zen_cortext_chat_colors WP option.', 'zen-cortext'); ?></li>
-            <li><?php esc_html_e('On every public render, the plugin emits an inline <style> block right after chat.css. CSS cascade puts those values on top of the file defaults — every var(--zc-*) reference resolves to your pick.', 'zen-cortext'); ?></li>
+            <li><?php esc_html_e('On every public render, the plugin attaches inline CSS right after chat.css (via wp_add_inline_style). CSS cascade puts those values on top of the file defaults — every var(--zc-*) reference resolves to your pick.', 'zen-cortext'); ?></li>
             <li><?php esc_html_e('chat.css itself is never modified by Color saves — your picks survive plugin updates.', 'zen-cortext'); ?></li>
         </ol>
 

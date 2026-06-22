@@ -177,6 +177,10 @@ class Zen_Cortext_Push {
                 'body'  => (string) $body,
                 'url'   => (string) $url,
                 'tag'   => (string) $tag,
+                // Notification icon driven by the Design → float-button
+                // icon setting (bundled plugin default when unset), resolved
+                // to a portable URL — no hardcoded site-root path.
+                'icon'  => Zen_Cortext_Design::brand_icon_url(),
             ));
 
             $success = 0;

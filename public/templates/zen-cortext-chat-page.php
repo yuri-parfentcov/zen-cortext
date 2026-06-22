@@ -4,15 +4,18 @@ if (!defined("ABSPATH")) { exit; }
  * Template Name: Zen Cortext — Full-page client chat
  *
  * Empty shell template — bypasses theme chrome AND the standard WordPress
- * head/footer pipeline. We do NOT call wp_head() / wp_footer(), so no plugin
- * or theme assets leak in (no Avada CSS, no jQuery, no Fusion JS, no
- * Leadin / HubSpot, no emoji, no oEmbed). The only things on the page are:
+ * head/footer pipeline. We do NOT call wp_head() / wp_footer(); instead we
+ * register the plugin's own assets and print ONLY those handles via
+ * wp_print_styles()/wp_print_scripts(), so everything goes through the core
+ * enqueue pipeline while no theme or other-plugin assets leak in (no Avada
+ * CSS, no jQuery, no Fusion JS, no Leadin / HubSpot, no emoji, no oEmbed).
+ * The only things on the page are:
  *
- *   - This template's inline page chrome CSS
- *   - The plugin's chat.css
- *   - Yanone Kaffeesatz font (Google Fonts)
- *   - The plugin's chat.js + zenCortextConfig
- *   - A small inline script for the mobile menu modal
+ *   - The plugin's chat.css (zen-cortext-public)
+ *   - The page-chrome stylesheet chat-page.css (zen-cortext-chat-page)
+ *   - The Design-settings inline CSS (font + --zc-* token overrides)
+ *   - The plugin's chat.js + localized zenCortextConfig
+ *   - chat-page.js (mobile menu modal + email click-to-copy)
  *
  * Layout:
  *   - No top header bar, no footer.
@@ -31,21 +34,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$intro          = get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card());
-$welcome        = get_option('zen_cortext_welcome_message', Zen_Cortext_Defaults::welcome_message());
-$default_chips  = array_values((array) get_option('zen_cortext_default_chips', array()));
-
-// chat.css is admin-editable from the Template Editor. asset_url()
-// returns the uploaded "live" URL when it exists, factory URL otherwise,
-// with an mtime cache-buster baked in.
-$chat_css_url          = Zen_Cortext_Template_Renderer::asset_url('chat.css');
-$chat_js_url           = ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.js';
-$rest_url              = rest_url('zen-cortext/v1/send');
-$rest_root             = rest_url('zen-cortext/v1');
-$attribution_ctx_url   = rest_url('zen-cortext/v1/attribution-context');
-$transcribe_url        = rest_url('zen-cortext/v1/transcribe');
-$voice_enabled         = (bool) get_option('zen_cortext_voice_enabled', false);
-$voice_max_sec         = 60;
+// $intro is consumed by public/views/chat.php (the intro card markup).
+// The chat runtime config (rest URLs, voice, chips, welcome message) is
+// localized onto chat.js via Zen_Cortext_Shortcode::chat_config_payload()
+// in the footer below, and the stylesheets/scripts are enqueued + printed
+// through the core pipeline — no hand-written asset URLs needed here.
+$intro = get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card());
 
 // Team member cards — pulled dynamically from user meta. The user list
 // is shared with the in-chat invite buttons, takeover, and the AI's
@@ -162,17 +156,21 @@ $buttons_html = ob_get_clean();
 <meta charset="<?php bloginfo('charset'); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,follow">
+<?php
+// Standalone page skips wp_head(), so the theme's header injectors never run
+// here. Emit the admin's custom Header code (Settings → Tracking) so the
+// conversion-critical chat page can carry GTM/GA4/Pixel/verification tags.
+Zen_Cortext_Shortcode::print_header_code();
+?>
 <title><?php echo esc_html(wp_get_document_title()); ?></title>
 
 <?php
-// Typography — both options default to '' (empty = "inherit from host
-// theme"). Standalone /talk/ has no host theme, so an empty option
-// substitutes the system-stack / 16px fallback declared in Defaults.
-//
-// The Google Fonts <link> is only emitted when the resolved value
-// mentions Yanone — case-insensitive sniff so admins typing
-// 'Yanone Kaffeesatz' in any casing still get the font file.
-// Other font stacks (system, brand-CDN, etc.) skip the preconnect.
+// Typography (Design settings) — both options default to '' (= "inherit
+// from the host theme"). The standalone chat page has no host theme, so an
+// empty option falls back to the system stack / 14px declared in Defaults.
+// No webfont is shipped: admins set whatever font-family they want in
+// Design settings and it lands via the inline CSS below — the plugin makes
+// no external font request.
 $chat_font_family_opt = trim((string) get_option('zen_cortext_font_family', ''));
 $chat_font_family     = $chat_font_family_opt !== ''
     ? $chat_font_family_opt
@@ -183,315 +181,28 @@ $chat_font_size_px  = $chat_font_size_opt > 0
     ? $chat_font_size_opt
     : Zen_Cortext_Defaults::font_size_standalone_fallback();
 
-$load_yanone_font = (stripos($chat_font_family, 'Yanone Kaffeesatz') !== false);
+// Register + enqueue the plugin's own assets, then print ONLY those
+// handles. Everything goes through the core enqueue/printing pipeline (no
+// hand-written <link>/<style> tags) while the standalone document stays
+// free of theme / other-plugin assets.
+$zc_shortcode = Zen_Cortext_Shortcode::get_instance();
+$zc_shortcode->register_assets();
+wp_enqueue_style('zen-cortext-public');
+wp_enqueue_style('zen-cortext-chat-page');
+
+// Design-settings inline CSS, printed AFTER the stylesheets so it wins:
+//  - body font-family / font-size from the picker (standalone fallbacks)
+//  - the --zc-* color tokens + typography overrides (empty on default sites)
+$zc_body_css     = 'body.zcp-body{font-family:' . Zen_Cortext_Shortcode::sanitize_font_family($chat_font_family)
+                 . ';font-size:' . (int) $chat_font_size_px . 'px;}';
+$zc_override_css = Zen_Cortext_Shortcode::build_color_override_css();
+wp_add_inline_style('zen-cortext-chat-page', $zc_body_css . $zc_override_css);
+
+wp_print_styles(array('zen-cortext-public', 'zen-cortext-chat-page'));
 ?>
-<?php
-// Standalone chat page owns the whole document — no wp_head/wp_footer,
-// so wp_enqueue_*() cannot apply. Inline tags are the correct pattern.
-// phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet,WordPress.WP.EnqueuedResources.NonEnqueuedScript
-?>
-<?php if ($load_yanone_font): ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yanone+Kaffeesatz:wght@400;500;600;700&display=swap">
-<?php endif; ?>
-<link rel="stylesheet" href="<?php echo esc_url($chat_css_url); ?>">
-<?php
-// Per-site --zc-* overrides set in the Chat Editor → Colors panel. Echoed
-// AFTER chat.css so cascade beats the published defaults. Empty string
-// when no overrides are configured, so this is a no-op on default sites.
-echo Zen_Cortext_Shortcode::build_color_override_style(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- returns a hardcoded <style> block built from validated hex/rgba values.
-?>
-<style>
-/* Hard reset — we own this page completely. */
-html, body { margin: 0; padding: 0; }
-*, *::before, *::after { box-sizing: border-box; }
-
-body.zcp-body {
-    /* !important keeps a host theme's body rule from overriding the
-       chat page's own background — fallback matches chat.css :root so
-       fresh installs without saved color overrides still look right. */
-    background: var(--zc-bg, #ffffff) !important;
-    color: var(--zc-text, #3c434a);
-    font-family: <?php
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- echoed inside a <style> block; wp_strip_all_tags removes any HTML, and esc_attr() would HTML-encode the ' and , characters that legitimate font-family stacks need (e.g. 'Yanone Kaffeesatz', sans-serif).
-        echo wp_strip_all_tags($chat_font_family);
-    ?>;
-    font-size: <?php echo (int) $chat_font_size_px; ?>px;
-    line-height: 1.2;
-    min-height: 100dvh;
-}
-.zcp-page { min-height: 100dvh; display: flex; flex-direction: column; background: var(--zc-bg, #ffffff); }
-
-/* ----- Main (chat container) — no header / no footer chrome ----- */
-.zcp-main {
-    flex: 1 0 auto;
-    width: 100%;
-    max-width: 950px;
-    margin: 0 auto;
-    padding: 32px 24px;
-    background: var(--zc-bg, #ffffff);
-}
-/* On desktop, keep the chat clear of the floating left rail (rail width 300px
-   + 24px left offset + 24px gap = 348px). On wide enough viewports the chat
-   re-centers naturally. */
-@media (min-width: 900px) {
-    .zcp-main {
-        margin-left: max(348px, calc(50% - 475px));
-        margin-right: 24px;
-    }
-}
-.zcp-main .zen-cortext-root {
-    max-width: none;
-    margin: 0;
-    padding: 0;
-}
-
-/* =====================================================================
-   Desktop floating quick-action rail (left edge, vertically centered)
-   ===================================================================== */
-.zcp-rail {
-    position: fixed;
-    top: 50%;
-    left: 24px;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    z-index: 50;
-    width: 300px;
-    max-height: calc(100dvh - 48px);
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-/* --- Team member cards --- */
-.zcp-team-card {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 16px;
-    background: var(--zc-surface, #ffffff);
-    border: 1px solid var(--zc-border, #c3c4c7);
-    border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-}
-.zcp-team-top {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-.zcp-team-role {
-    font-size: 1em;
-    color: var(--zc-text-muted, #646970);
-    line-height: 1.35;
-}
-a.zcp-team-left, .zcp-team-left {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex-shrink: 0;
-    gap: 6px;
-    text-decoration: none;
-    color: inherit;
-}
-a.zcp-team-left:hover .zcp-team-name { text-decoration: underline; }
-.zcp-team-avatar {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-.zcp-team-name {
-    font-size: 1em;
-    font-weight: 600;
-    color: var(--zc-text-strong, #1d2327);
-    line-height: 1.2;
-    text-align: center;
-    max-width: 86px;
-    word-wrap: break-word;
-}
-.zcp-team-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: flex-start;
-}
-.zcp-team-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 12px;
-    border-radius: 6px;
-    font-size: 1em;
-    text-decoration: none;
-    cursor: pointer;
-    line-height: 1;
-    transition: background .15s, color .15s;
-    position: relative;
-    font-family: inherit;
-}
-.zcp-team-btn svg { flex-shrink: 0; width: 17px; height: 17px; }
-.zcp-team-btn-email { background: #f0f0f0; color: #333; }
-.zcp-team-btn-email:hover { background: #e2e2e2; color: #111; }
-.zcp-team-btn-wa { background: #25d366; color: #fff; }
-.zcp-team-btn-wa:hover { background: #1fb855; color: #fff; }
-.zcp-team-btn-li { background: #0A66C2; color: #fff; }
-.zcp-team-btn-li:hover { background: #004182; color: #fff; }
-.zcp-team-toast {
-    position: absolute;
-    top: -28px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #333;
-    color: #fff;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.6875em;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .25s;
-}
-.zcp-team-toast.zcp-show { opacity: 1; }
-
-/* --- Quick link buttons ---
-   No left-border stripe — the previous 3px olive stripe was hardcoded
-   to one palette and the user has rejected left-stripe accents on
-   cards in general. Hover swaps the full border to --zc-accent so the
-   brand color still lands on interaction without committing one side
-   of the card to a palette-specific value. */
-.zcp-rail-btn {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 13px 18px;
-    background: var(--zc-surface, #ffffff);
-    border: 1px solid var(--zc-border, #c3c4c7);
-    border-radius: 10px;
-    text-decoration: none;
-    color: var(--zc-text, #3c434a);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    transition: background-color .15s, border-color .15s, transform .12s, box-shadow .15s;
-    font-family: inherit;
-    line-height: 1.2;
-}
-.zcp-rail-btn:hover {
-    background: var(--zc-assistant-bg, #f0f0f1);
-    border-color: var(--zc-accent, #2271b1);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
-    transform: translateX(2px);
-}
-.zcp-rail-btn:active { transform: translateX(2px) translateY(1px); }
-.zcp-rail-btn-icon {
-    font-size: 1.375em;
-    line-height: 1;
-    flex-shrink: 0;
-}
-.zcp-rail-btn-label {
-    font-size: 1.125em;
-    font-weight: 600;
-    color: var(--zc-text-strong, #1d2327);
-}
-.zcp-rail-btn-prefix {
-    font-weight: 400;
-    /* Sized against parent .zcp-rail-btn-label (1.125em), so 0.889em
-       restores the original 16/18 ratio (16px prefix / 18px label). */
-    font-size: 0.889em;
-    color: var(--zc-text-muted, #646970);
-}
-
-/* =====================================================================
-   Mobile floating menu trigger + modal
-   Hidden by default; shown only on small viewports.
-   ===================================================================== */
-.zcp-mobile-trigger {
-    display: none;
-    position: fixed;
-    top: 16px;
-    left: 16px;
-    z-index: 60;
-    width: 52px;
-    height: 52px;
-    padding: 0;
-    background: var(--zc-surface, #ffffff);
-    border: 1px solid var(--zc-border, #c3c4c7);
-    border-radius: 50%;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
-    cursor: pointer;
-    align-items: center;
-    justify-content: center;
-    transition: transform .12s, box-shadow .15s;
-}
-.zcp-mobile-trigger:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.14); }
-.zcp-mobile-trigger:active { transform: translateY(1px); }
-.zcp-mobile-trigger img {
-    width: 30px; height: 30px; display: block;
-}
-
-.zcp-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    background: rgba(20, 22, 30, 0.55);
-    padding: 64px 16px 24px;
-    overflow-y: auto;
-    -webkit-tap-highlight-color: transparent;
-}
-.zcp-modal[hidden] { display: none; }
-.zcp-modal-card {
-    width: 100%;
-    max-width: 420px;
-    background: var(--zc-surface, #ffffff);
-    border-radius: 14px;
-    padding: 18px 18px 22px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.20);
-    position: relative;
-}
-.zcp-modal-title {
-    font-size: 1.25em;
-    font-weight: 600;
-    margin: 4px 0 14px;
-    color: var(--zc-text-strong, #1d2327);
-    padding-right: 36px;
-}
-.zcp-modal-close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: 0;
-    background: transparent;
-    color: var(--zc-text-muted, #646970);
-    font-size: 1.625em;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color .12s, color .12s;
-}
-.zcp-modal-close:hover { background: var(--zc-assistant-bg, #f0f0f1); color: var(--zc-text-strong, #1d2327); }
-.zcp-modal-list { display: flex; flex-direction: column; gap: 12px; }
-.zcp-modal-list .zcp-rail-btn { width: 100%; }
-.zcp-modal-list .zcp-team-card { box-shadow: none; border: 1px solid var(--zc-border, #c3c4c7); }
-
-/* ----- Breakpoint: switch from desktop rail to mobile trigger ----- */
-@media (max-width: 899px) {
-    .zcp-rail { display: none; }
-    .zcp-mobile-trigger { display: flex; }
-    .zcp-main { padding: 80px 16px 24px; }
-    /* Body font-size override removed in 2.34.10 — picker now drives
-       both desktop and mobile via the inline body rule above. */
-}
-</style>
 </head>
 <body class="zcp-body">
+<?php Zen_Cortext_Shortcode::print_body_code(); ?>
 <?php
 // The visible body markup is owned by chat-page-body.tpl.html (admins
 // edit the .tpl.html in the Chat Editor; raw PHP is no longer accepted
@@ -504,81 +215,29 @@ $chat_html = ob_get_clean();
 $zc_chat_page_body = Zen_Cortext_Template_Renderer::render('chat-page-body.tpl.html', array(
     'rail_buttons_html'    => $buttons_html, // already sanitized at construction time
     'chat_html'            => $chat_html,
-    'mobile_trigger_icon'  => '/biometrics.png',
+    // Fingerprint "tap to chat" icon for the mobile trigger button — a
+    // bundled plugin asset (portable; no hardcoded site-root path).
+    'mobile_trigger_icon'  => plugins_url('public/assets/biometrics.png', ZEN_CORTEXT_PLUGIN_FILE),
     'quick_actions_label'  => __('Quick actions', 'zen-cortext'),
     'mobile_open_label'    => __('Open quick actions menu', 'zen-cortext'),
 ));
-// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns the full chat-page body HTML built from a template; vars are sanitized at construction.
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $zc_chat_page_body is full page HTML (SVG icons + Alpine.js directives + the chat shell) produced by Zen_Cortext_Template_Renderer, which escapes EVERY dynamic placeholder itself (esc_html for {{ key }}, esc_url for {{ url: }}, esc_attr for {{ attr: }}; only pre-built {{ raw: }} HTML is passed through). The two raw inputs — $buttons_html and $chat_html — are assembled above/in chat.php with per-field esc_html()/esc_url()/esc_attr(). wp_kses_post() can't be used here: it would strip the SVG elements and Alpine attributes and break the page.
 echo $zc_chat_page_body;
 ?>
 
-<script>
-window.zenCortextConfig = {
-    restUrl:               <?php echo wp_json_encode(esc_url_raw($rest_url)); ?>,
-    restRoot:              <?php echo wp_json_encode(esc_url_raw($rest_root)); ?>,
-    attributionContextUrl: <?php echo wp_json_encode(esc_url_raw($attribution_ctx_url)); ?>,
-    transcribeUrl:         <?php echo wp_json_encode(esc_url_raw($transcribe_url)); ?>,
-    voiceEnabled:          <?php echo wp_json_encode($voice_enabled); ?>,
-    voiceMaxSec:           <?php echo wp_json_encode($voice_max_sec); ?>,
-    introCard:             <?php echo wp_json_encode($intro); ?>,
-    welcomeMessage:        <?php echo wp_json_encode($welcome); ?>,
-    defaultChips:          <?php echo wp_json_encode($default_chips); ?>
-};
-
-/* Mobile quick-actions modal */
-(function () {
-    var trigger = document.getElementById('zcp-mobile-trigger');
-    var modal   = document.getElementById('zcp-modal');
-    var closeBtn = document.getElementById('zcp-modal-close');
-    if (!trigger || !modal || !closeBtn) return;
-
-    function open() {
-        modal.hidden = false;
-        document.documentElement.style.overflow = 'hidden';
-    }
-    function close() {
-        modal.hidden = true;
-        document.documentElement.style.overflow = '';
-    }
-    trigger.addEventListener('click', open);
-    closeBtn.addEventListener('click', close);
-    modal.addEventListener('click', function (e) {
-        // click on the backdrop (not the card) closes
-        if (e.target === modal) close();
-    });
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && !modal.hidden) close();
-    });
-})();
-
-/* Email click-to-copy with toast */
-(function () {
-    document.addEventListener('click', function (e) {
-        var el = e.target.closest('.zcp-team-btn-email');
-        if (!el) return;
-        var email = el.getAttribute('data-email');
-        if (!email) return;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            e.preventDefault();
-            navigator.clipboard.writeText(email).then(function () {
-                var t = el.querySelector('.zcp-team-toast');
-                if (!t) return;
-                t.classList.add('zcp-show');
-                setTimeout(function () { t.classList.remove('zcp-show'); }, 1500);
-            });
-        }
-    });
-})();
-</script>
-<script src="<?php echo esc_url($chat_js_url); ?>?ver=<?php echo esc_attr(ZEN_CORTEXT_VERSION); ?>"></script>
-<?php // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet,WordPress.WP.EnqueuedResources.NonEnqueuedScript ?>
-
 <?php
-/* OPTIONAL — to add tracking or other plugins back, uncomment:
-   wp_footer();
-   …but be aware this will pull in everything that hooks wp_footer.
-   For surgical control, do_action('zen_cortext_chat_page_footer'); and
-   wire individual hooks elsewhere. */
+// Localize the runtime config onto chat.js, enqueue the modal / email-copy
+// behaviors (chat-page.js), then print ONLY the plugin's scripts. Same
+// enqueue/printing pipeline as the head — no hand-written <script> tags,
+// and nothing the theme or other plugins queued leaks onto the page.
+wp_enqueue_script('zen-cortext-public');
+wp_localize_script('zen-cortext-public', 'zenCortextConfig', Zen_Cortext_Shortcode::chat_config_payload());
+wp_enqueue_script('zen-cortext-chat-page');
+wp_print_scripts(array('zen-cortext-public', 'zen-cortext-chat-page'));
+
+// Admin's custom Footer code (Settings → Tracking) — closing-body scripts,
+// chat widgets, deferred trackers, etc.
+Zen_Cortext_Shortcode::print_footer_code();
 ?>
 </body>
 </html>

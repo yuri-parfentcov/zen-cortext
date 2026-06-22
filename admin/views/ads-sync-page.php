@@ -43,6 +43,13 @@ var TOP_HEADLINES_LIMIT = 8;
 var TOP_KEYWORDS_LIMIT  = 12;
 var KEYWORD_LOOKBACK    = 'LAST_30_DAYS'; // GAQL date range
 var DELETE_MISSING      = false;          // true = drop WP rows absent from this run
+
+// Which campaign statuses to fetch. The "Campaigns to fetch" dropdown on
+// the WordPress admin page rewrites this line; edit it by hand if you prefer.
+//   ['ENABLED']            -> active campaigns only
+//   ['ENABLED', 'PAUSED']  -> active + paused
+//   []                     -> all statuses (including removed)
+var CAMPAIGN_STATUSES   = ['ENABLED'];
 // -----------------------------------------------------------------------
 
 function main() {
@@ -54,9 +61,16 @@ function main() {
   attachHeadlines(campaigns);
   attachKeywords(campaigns);
 
+  var groups = collectAdGroups();
+  attachAdGroupHeadlines(groups);
+  attachAdGroupKeywords(groups);
+
   var rows = [];
   for (var id in campaigns) {
     if (campaigns.hasOwnProperty(id)) rows.push(campaigns[id]);
+  }
+  for (var gid in groups) {
+    if (groups.hasOwnProperty(gid)) rows.push(groups[gid]);
   }
 
   Logger.log('Posting %s campaigns to %s', rows.length, ENDPOINT_URL);
@@ -75,20 +89,34 @@ function main() {
   }
 }
 
-/** Enabled campaigns into a {campaign_id → row} map. */
+/** Build a `campaign.status IN (...)` filter from CAMPAIGN_STATUSES. Empty array = no filter (all statuses). */
+function campaignStatusClause() {
+  if (!CAMPAIGN_STATUSES || !CAMPAIGN_STATUSES.length) return '';
+  var quoted = [];
+  for (var i = 0; i < CAMPAIGN_STATUSES.length; i++) {
+    quoted.push("'" + CAMPAIGN_STATUSES[i] + "'");
+  }
+  return 'campaign.status IN (' + quoted.join(', ') + ')';
+}
+
+/** Campaigns (filtered by CAMPAIGN_STATUSES) into a {campaign_id → row} map. */
 function collectCampaigns() {
+  var statusClause = campaignStatusClause();
   var query =
     'SELECT campaign.id, campaign.name, campaign.status, campaign_budget.amount_micros ' +
-    'FROM campaign ' +
-    "WHERE campaign.status = 'ENABLED'";
+    'FROM campaign' +
+    (statusClause ? ' WHERE ' + statusClause : '');
   var iterator = AdsApp.search(query);
   var out = {};
   while (iterator.hasNext()) {
     var row = iterator.next();
     var id = String(row.campaign.id);
     out[id] = {
+      type:          'campaign',
       campaign_id:   id,
       campaign_name: row.campaign.name || '',
+      ad_group_id:   '',
+      ad_group_name: '',
       status:        row.campaign.status || '',
       budget_micros: (row.campaignBudget && row.campaignBudget.amountMicros)
                        ? Number(row.campaignBudget.amountMicros) : null,
@@ -106,8 +134,8 @@ function attachHeadlines(campaigns) {
     'FROM ad_group_ad ' +
     "WHERE ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD' " +
     "AND ad_group_ad.status = 'ENABLED' " +
-    "AND ad_group.status = 'ENABLED' " +
-    "AND campaign.status = 'ENABLED'";
+    "AND ad_group.status = 'ENABLED'" +
+    (campaignStatusClause() ? ' AND ' + campaignStatusClause() : '');
   var iterator = AdsApp.search(query);
   var seen = {};
   while (iterator.hasNext()) {
@@ -132,9 +160,9 @@ function attachKeywords(campaigns) {
   var query =
     'SELECT campaign.id, ad_group_criterion.keyword.text, metrics.impressions ' +
     'FROM keyword_view ' +
-    "WHERE campaign.status = 'ENABLED' " +
-    "AND ad_group.status = 'ENABLED' " +
+    "WHERE ad_group.status = 'ENABLED' " +
     "AND ad_group_criterion.status = 'ENABLED' " +
+    (campaignStatusClause() ? 'AND ' + campaignStatusClause() + ' ' : '') +
     'AND segments.date DURING ' + KEYWORD_LOOKBACK + ' ' +
     'ORDER BY metrics.impressions DESC ' +
     'LIMIT 2000';
@@ -152,6 +180,91 @@ function attachKeywords(campaigns) {
     if (campaigns[cid].top_keywords.length >= TOP_KEYWORDS_LIMIT) continue;
     seen[cid][kw] = true;
     campaigns[cid].top_keywords.push(kw);
+  }
+}
+
+/** Ad groups (honoring CAMPAIGN_STATUSES) into a {ad_group_id → row} map. */
+function collectAdGroups() {
+  var statusClause = campaignStatusClause();
+  var query =
+    'SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group.status ' +
+    'FROM ad_group ' +
+    "WHERE ad_group.status = 'ENABLED'" +
+    (statusClause ? ' AND ' + statusClause : '');
+  var iterator = AdsApp.search(query);
+  var out = {};
+  while (iterator.hasNext()) {
+    var row = iterator.next();
+    var gid = String(row.adGroup.id);
+    out[gid] = {
+      type:          'group',
+      campaign_id:   String(row.campaign.id),
+      campaign_name: row.campaign.name || '',
+      ad_group_id:   gid,
+      ad_group_name: row.adGroup.name || '',
+      status:        row.adGroup.status || '',
+      budget_micros: null,
+      top_headlines: [],
+      top_keywords:  []
+    };
+  }
+  return out;
+}
+
+/** RSA headlines per ad group, dedupe, top N. */
+function attachAdGroupHeadlines(groups) {
+  var query =
+    'SELECT ad_group.id, ad_group_ad.ad.responsive_search_ad.headlines ' +
+    'FROM ad_group_ad ' +
+    "WHERE ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD' " +
+    "AND ad_group_ad.status = 'ENABLED' " +
+    "AND ad_group.status = 'ENABLED'" +
+    (campaignStatusClause() ? ' AND ' + campaignStatusClause() : '');
+  var iterator = AdsApp.search(query);
+  var seen = {};
+  while (iterator.hasNext()) {
+    var row = iterator.next();
+    var gid = String(row.adGroup.id);
+    if (!groups[gid]) continue;
+    var rsa = row.adGroupAd && row.adGroupAd.ad && row.adGroupAd.ad.responsiveSearchAd;
+    var heads = (rsa && rsa.headlines) ? rsa.headlines : [];
+    if (!seen[gid]) seen[gid] = {};
+    for (var i = 0; i < heads.length; i++) {
+      var text = (heads[i] && heads[i].text) ? String(heads[i].text).trim() : '';
+      if (!text || seen[gid][text]) continue;
+      if (groups[gid].top_headlines.length >= TOP_HEADLINES_LIMIT) break;
+      seen[gid][text] = true;
+      groups[gid].top_headlines.push(text);
+    }
+  }
+}
+
+/** Top keywords by impressions per ad group in the lookback window. */
+function attachAdGroupKeywords(groups) {
+  var statusClause = campaignStatusClause();
+  var query =
+    'SELECT ad_group.id, ad_group_criterion.keyword.text, metrics.impressions ' +
+    'FROM keyword_view ' +
+    "WHERE ad_group.status = 'ENABLED' " +
+    "AND ad_group_criterion.status = 'ENABLED' " +
+    (statusClause ? 'AND ' + statusClause + ' ' : '') +
+    'AND segments.date DURING ' + KEYWORD_LOOKBACK + ' ' +
+    'ORDER BY metrics.impressions DESC ' +
+    'LIMIT 5000';
+  var iterator = AdsApp.search(query);
+  var seen = {};
+  while (iterator.hasNext()) {
+    var row = iterator.next();
+    var gid = String(row.adGroup.id);
+    if (!groups[gid]) continue;
+    var kw = (row.adGroupCriterion && row.adGroupCriterion.keyword && row.adGroupCriterion.keyword.text)
+               ? String(row.adGroupCriterion.keyword.text).trim() : '';
+    if (!kw) continue;
+    if (!seen[gid]) seen[gid] = {};
+    if (seen[gid][kw]) continue;
+    if (groups[gid].top_keywords.length >= TOP_KEYWORDS_LIMIT) continue;
+    seen[gid][kw] = true;
+    groups[gid].top_keywords.push(kw);
   }
 }
 JS;
@@ -219,7 +332,7 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
 
     <h2 style="margin-top:36px;"><?php esc_html_e('2. Google Ads script', 'zen-cortext'); ?></h2>
     <p class="description">
-        <?php esc_html_e('Runs inside Google Ads — not generic Apps Script — using the native AdsApp API. No OAuth setup required: Google Ads scripts have built-in access to your account data.', 'zen-cortext'); ?>
+        <?php esc_html_e('Runs inside Google Ads — not generic Apps Script — using the native AdsApp API. No OAuth setup required: Google Ads scripts have built-in access to your account data. It also pulls ad-group-level headlines & keywords in the same run.', 'zen-cortext'); ?>
     </p>
 
     <ol class="zat-steps">
@@ -244,6 +357,15 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
         <li><?php esc_html_e('Within a minute of the first run, the synced campaigns will appear in the table at the bottom of this page.', 'zen-cortext'); ?></li>
     </ol>
 
+    <p class="zat-script-config">
+        <label for="zat-script-statuses"><strong><?php esc_html_e('Campaigns to fetch:', 'zen-cortext'); ?></strong></label>
+        <select id="zat-script-statuses">
+            <option value="ENABLED"><?php esc_html_e('Enabled only', 'zen-cortext'); ?></option>
+            <option value="ENABLED,PAUSED"><?php esc_html_e('Enabled and paused', 'zen-cortext'); ?></option>
+            <option value="ALL"><?php esc_html_e('All (including removed)', 'zen-cortext'); ?></option>
+        </select>
+        <span class="description"><?php esc_html_e('Sets which campaign statuses the script syncs. Updates the script below — choose this before you copy.', 'zen-cortext'); ?></span>
+    </p>
     <p>
         <button type="button" class="button button-primary" id="zat-script-copy">
             <?php esc_html_e('Copy script', 'zen-cortext'); ?>
@@ -257,7 +379,7 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
     <p class="description" style="margin-top:8px;">
         <strong><?php esc_html_e('Tunables at the top of the script:', 'zen-cortext'); ?></strong>
         <code>TOP_HEADLINES_LIMIT</code>, <code>TOP_KEYWORDS_LIMIT</code>, <code>KEYWORD_LOOKBACK</code>,
-        <code>DELETE_MISSING</code>.
+        <code>DELETE_MISSING</code>, <code>CAMPAIGN_STATUSES</code>.
         <?php esc_html_e('Leave DELETE_MISSING = false unless you want every sync to delete campaigns that this script no longer reports — useful only when the script is the single source of truth.', 'zen-cortext'); ?>
     </p>
 
@@ -266,13 +388,13 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
         <?php
         if ($sync_count > 0 && $sync_ts) {
             printf(
-                /* translators: %1$d is the number of synced Google Ads campaigns, %2$s is the last-sync datetime. */
-                esc_html__('%1$d campaigns. Last sync: %2$s.', 'zen-cortext'),
+                /* translators: %1$d is the number of synced Google Ads rows (campaigns + ad groups), %2$s is the last-sync datetime. */
+                esc_html__('%1$d synced rows. Last sync: %2$s.', 'zen-cortext'),
                 (int) $sync_count,
                 esc_html($sync_ts)
             );
         } else {
-            esc_html_e('No campaigns synced yet. Run the script in Google Ads to populate this list.', 'zen-cortext');
+            esc_html_e('No synced rows yet. Run the script in Google Ads to populate this list.', 'zen-cortext');
         }
         ?>
     </p>
@@ -288,7 +410,9 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
     <table class="widefat striped" id="zat-ads-list">
         <thead>
             <tr>
+                <th><?php esc_html_e('Type', 'zen-cortext'); ?></th>
                 <th><?php esc_html_e('Campaign', 'zen-cortext'); ?></th>
+                <th><?php esc_html_e('Ad group', 'zen-cortext'); ?></th>
                 <th><?php esc_html_e('ID', 'zen-cortext'); ?></th>
                 <th><?php esc_html_e('Status', 'zen-cortext'); ?></th>
                 <th><?php esc_html_e('Budget', 'zen-cortext'); ?></th>
@@ -298,43 +422,9 @@ $google_ads_script = str_replace('{{ENDPOINT_URL}}', $ingest_endpoint, $google_a
             </tr>
         </thead>
         <tbody id="zat-ads-list-body">
-            <tr><td colspan="7"><em><?php esc_html_e('Loading…', 'zen-cortext'); ?></em></td></tr>
+            <tr><td colspan="9"><em><?php esc_html_e('Loading…', 'zen-cortext'); ?></em></td></tr>
         </tbody>
     </table>
 </div>
 
-<style>
-.zen-cortext-ads-sync .zat-steps { margin: 12px 0 16px 24px; }
-.zen-cortext-ads-sync .zat-steps li { margin-bottom: 6px; }
-.zen-cortext-ads-sync .zat-script-source {
-    width: 100%;
-    font-family: Consolas, Monaco, "Courier New", monospace;
-    font-size: 12px;
-    line-height: 1.4;
-    background: #1d1f21;
-    color: #c5c8c6;
-    border: 1px solid #444;
-    border-radius: 4px;
-    padding: 12px;
-    box-sizing: border-box;
-}
-.zen-cortext-ads-sync .zat-script-source:focus {
-    outline: 2px solid #2271b1;
-    outline-offset: 1px;
-}
-.zen-cortext-ads-sync .zat-ads-detail-cell { background: #f6f7f7; padding: 12px 16px; }
-.zen-cortext-ads-sync .zat-ads-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-}
-.zen-cortext-ads-sync .zat-ads-detail-grid h4 { margin: 0 0 6px 0; }
-.zen-cortext-ads-sync .zat-ads-detail-list {
-    margin: 0;
-    padding-left: 18px;
-    max-height: 280px;
-    overflow-y: auto;
-}
-.zen-cortext-ads-sync .zat-ads-detail-list li { margin-bottom: 2px; }
-</style>
 </div>

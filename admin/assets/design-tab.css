@@ -1,0 +1,47 @@
+/*
+ * Zen Cortext admin — Design tab
+ * Moved out of an inline <style> block into an enqueued stylesheet.
+ */
+
+    /* Preview viewport — a 280x180 faux browser viewport. The button
+       inside is rendered with the same dimensions / shadow / icon
+       proportions as the public render so the admin sees exactly how
+       it'll look. JS positions it according to vertical/horizontal/
+       padding (padding is preserved 1:1 from the input value since the
+       admin form caps it at 200px and the viewport is plenty large). */
+    .zcfb-preview-wrap {
+        max-width: 320px; margin: 6px 0 22px;
+    }
+    .zcfb-preview-label {
+        display: block; font-size: 12px; color: #50575e; margin-bottom: 6px;
+        text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+    }
+    .zcfb-preview-viewport {
+        position: relative; width: 280px; height: 180px;
+        background: repeating-linear-gradient(45deg, #f6f7f7, #f6f7f7 10px, #fff 10px, #fff 20px);
+        border: 1px solid #c3c4c7; border-radius: 6px; overflow: hidden;
+    }
+    .zcfb-preview-btn {
+        position: absolute;
+        display: flex; align-items: center; justify-content: center;
+        width: 40px; height: 40px; border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+        text-decoration: none;
+        transition: top 0.15s ease, bottom 0.15s ease, left 0.15s ease, right 0.15s ease, background 0.1s ease;
+    }
+    .zcfb-preview-btn img { width: 60%; height: 60%; object-fit: contain; display: block; }
+    .zcfb-preview-btn.is-disabled {
+        opacity: 0.35; filter: grayscale(0.6);
+    }
+
+.zcd-section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #dcdcde; }
+.zcd-section-title { margin: 24px 0 8px; }
+.zcd-section-hint { color: #50575e; margin: 0 0 16px; max-width: 880px; }
+.zcd-create-form { margin: 12px 0 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.zcd-create-form .description { color: #50575e; }
+.zcd-pages-table { margin-top: 8px; max-width: 1100px; }
+.zcd-pages-table th, .zcd-pages-table td { vertical-align: middle; }
+.zcd-pages-table .zcd-actions { white-space: nowrap; }
+.zcd-pages-table .zcd-actions .button { margin-right: 4px; }
+.zcd-empty { color: #50575e; margin-top: 8px; }

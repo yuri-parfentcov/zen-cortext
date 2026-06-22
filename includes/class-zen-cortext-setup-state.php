@@ -40,11 +40,11 @@ class Zen_Cortext_Setup_State {
      *  per-render COUNT(*) doesn't hit the DB on every Getting Started
      *  view — the value only flips when the admin actually syncs. */
     public static function kb_indexed() {
-        $cached = get_transient('zci_kb_count');
+        $cached = get_transient('zen_cortext_kb_count');
         if ($cached === false) {
             global $wpdb;
             $cached = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}zen_cortext_kb");
-            set_transient('zci_kb_count', $cached, 60);
+            set_transient('zen_cortext_kb_count', $cached, 60);
         }
         return (int) $cached > 0;
     }

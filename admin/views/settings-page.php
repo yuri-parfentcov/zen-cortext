@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) exit;
 $tabs = array(
     'connection' => __('Connection', 'zen-cortext'),
     'voice'      => __('Voice', 'zen-cortext'),
-    'sessions'   => __('User sessions', 'zen-cortext'),
+    'sessions'   => __('Tracking', 'zen-cortext'),
     'pages'      => __('Chat pages', 'zen-cortext'),
     'design'     => __('Design', 'zen-cortext'),
 );
@@ -113,24 +113,27 @@ $tabs = array(
         ?>
 
         <?php if ($tab === 'connection'): ?>
-            <h2><?php esc_html_e('Backend for internal jobs', 'zen-cortext'); ?></h2>
-            <p class="description"><?php esc_html_e('Choose how the plugin runs classify + restructure jobs. The frontend chat always uses the HTTP API (CLI cannot stream into the browser).', 'zen-cortext'); ?></p>
-            <?php $processor = get_option('zen_cortext_processor', 'api'); ?>
-            <table class="form-table" role="presentation">
-                <tr>
-                    <th><?php esc_html_e('Processor', 'zen-cortext'); ?></th>
-                    <td>
-                        <label style="display:block; margin-bottom:6px;">
-                            <input type="radio" name="zen_cortext_processor" value="api" <?php checked($processor, 'api'); ?> />
-                            <?php esc_html_e('Anthropic HTTP API (uses the API key below)', 'zen-cortext'); ?>
-                        </label>
-                        <label style="display:block;">
-                            <input type="radio" name="zen_cortext_processor" value="cli" <?php checked($processor, 'cli'); ?> />
-                            <?php esc_html_e('Claude Code CLI (shells out to the `claude` binary on this server)', 'zen-cortext'); ?>
-                        </label>
-                    </td>
-                </tr>
-            </table>
+            <?php
+            // Active backend for INTERNAL admin AI jobs (classify / restructure
+            // / Brainstorm / artifact builder / Template Editor AI). Default is
+            // the Anthropic HTTP API; the optional Claude Code CLI add-on
+            // plugin overrides this label via the zen_cortext_backend_label
+            // filter when it's installed + active. The visitor chat always uses
+            // the HTTP API regardless.
+            $zc_default_backend = __('Anthropic HTTP API', 'zen-cortext');
+            $zc_backend_label   = apply_filters('zen_cortext_backend_label', $zc_default_backend);
+            $zc_cli_active      = ($zc_backend_label !== $zc_default_backend);
+            ?>
+            <h2><?php esc_html_e('Backend for internal AI jobs', 'zen-cortext'); ?></h2>
+            <p class="description" style="font-size:13px;">
+                <span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;background:<?php echo $zc_cli_active ? '#46b450' : '#2271b1'; ?>;"></span>
+                <strong><?php echo esc_html($zc_backend_label); ?></strong>
+                <?php if ($zc_cli_active): ?>
+                    — <?php esc_html_e('the Claude Code CLI add-on is active and handling internal jobs (subscription-billed). The visitor chat still uses the HTTP API.', 'zen-cortext'); ?>
+                <?php else: ?>
+                    — <?php esc_html_e('all AI jobs use the Anthropic HTTP API. (Install the optional Claude Code CLI add-on to route internal jobs through a local Claude binary.)', 'zen-cortext'); ?>
+                <?php endif; ?>
+            </p>
 
             <h2><?php esc_html_e('Anthropic HTTP API', 'zen-cortext'); ?></h2>
             <table class="form-table" role="presentation">
@@ -141,7 +144,7 @@ $tabs = array(
                                value="<?php echo esc_attr(get_option('zen_cortext_api_key', '')); ?>"
                                class="regular-text" autocomplete="off" />
                         <button type="button" class="button" id="zen-cortext-test-connection"><?php esc_html_e('Test connection', 'zen-cortext'); ?></button>
-                        <p class="description"><?php esc_html_e('Stored locally as a WP option. Get a key from console.anthropic.com. Required for the frontend chat regardless of the processor choice above.', 'zen-cortext'); ?></p>
+                        <p class="description"><?php esc_html_e('Stored locally as a WP option. Get a key from console.anthropic.com. Required for the chat and all AI features.', 'zen-cortext'); ?></p>
                         <div id="zen-cortext-test-result"></div>
                     </td>
                 </tr>
@@ -160,7 +163,7 @@ $tabs = array(
                         <input type="text" id="zen_cortext_classify_model" name="zen_cortext_classify_model"
                                value="<?php echo esc_attr(get_option('zen_cortext_classify_model', 'claude-sonnet-4-6')); ?>"
                                class="regular-text" />
-                        <p class="description"><?php esc_html_e('Used for classify + restructure when processor = API. Sonnet recommended.', 'zen-cortext'); ?></p>
+                        <p class="description"><?php esc_html_e('Used for classify + restructure. Sonnet recommended.', 'zen-cortext'); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -178,7 +181,7 @@ $tabs = array(
                         </p>
                         <p class="description">
                             <strong><?php esc_html_e('Does NOT affect:', 'zen-cortext'); ?></strong>
-                            <?php esc_html_e('Claude Code CLI runs (the CLI manages its own output budget), the Brainstorm page (uses Opus 4.6 with a dedicated 24000-token cap for extended thinking), or short utility calls like classification (hardcoded small caps).', 'zen-cortext'); ?>
+                            <?php esc_html_e('the Brainstorm page (uses Opus 4.6 with a dedicated 24000-token cap for extended thinking) or short utility calls like classification (hardcoded small caps).', 'zen-cortext'); ?>
                         </p>
                         <p class="description">
                             <?php esc_html_e('Higher = longer answers and KB rewrites, but more cost per call. Lower = tighter responses, cheaper, but risk of being truncated mid-sentence.', 'zen-cortext'); ?>
@@ -187,27 +190,6 @@ $tabs = array(
                 </tr>
             </table>
 
-            <h2><?php esc_html_e('Claude Code CLI', 'zen-cortext'); ?></h2>
-            <table class="form-table" role="presentation">
-                <tr>
-                    <th><label for="zen_cortext_cli_path"><?php esc_html_e('CLI binary', 'zen-cortext'); ?></label></th>
-                    <td>
-                        <input type="text" id="zen_cortext_cli_path" name="zen_cortext_cli_path"
-                               value="<?php echo esc_attr(get_option('zen_cortext_cli_path', 'claude')); ?>"
-                               class="regular-text" />
-                        <p class="description"><?php esc_html_e('Path to the claude binary. Use a full path like /usr/local/bin/claude if it is not on PHP\'s PATH. The CLI must be authenticated for the OS user that runs PHP.', 'zen-cortext'); ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th><label for="zen_cortext_cli_model"><?php esc_html_e('CLI job model', 'zen-cortext'); ?></label></th>
-                    <td>
-                        <input type="text" id="zen_cortext_cli_model" name="zen_cortext_cli_model"
-                               value="<?php echo esc_attr(get_option('zen_cortext_cli_model', 'sonnet')); ?>"
-                               class="regular-text" />
-                        <p class="description"><?php esc_html_e('Passed as --model. Aliases like sonnet/haiku/opus or full IDs both work.', 'zen-cortext'); ?></p>
-                    </td>
-                </tr>
-            </table>
 
         <?php elseif ($tab === 'voice'):
             // Voice transcription — Groq Whisper Large v3 Turbo with
@@ -310,6 +292,45 @@ $tabs = array(
                             <br>
                             <?php esc_html_e('Has no effect if tracking is disabled above.', 'zen-cortext'); ?>
                         </p>
+                    </td>
+                </tr>
+            </table>
+
+            <?php
+            // Custom code (chat pages). The full-page chat templates (/talk/)
+            // own the whole document and skip wp_head()/wp_footer(), so the
+            // theme's header/footer injectors, GTM4WP, and header-footer-code
+            // plugins never run there. These fields inject the admin's own code
+            // directly — GTM, GA4, Meta Pixel, site-verification tags, etc.
+            $header_code = (string) get_option('zen_cortext_header_code', '');
+            $body_code   = (string) get_option('zen_cortext_body_code', '');
+            $footer_code = (string) get_option('zen_cortext_footer_code', '');
+            ?>
+            <h2><?php esc_html_e('Custom code (chat pages)', 'zen-cortext'); ?></h2>
+            <p class="description" style="max-width:880px;">
+                <?php esc_html_e('The full-page chat (the /talk/ page) renders its own document and intentionally bypasses your theme — so analytics or scripts you add via your theme or a header/footer plugin do NOT load there. Paste that code below and it will be injected into the standalone chat page. Use it for Google Tag Manager, Google Analytics, the Meta Pixel, site-verification meta tags, or any custom script.', 'zen-cortext'); ?>
+            </p>
+
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th><label for="zen_cortext_header_code"><?php esc_html_e('Header code', 'zen-cortext'); ?></label></th>
+                    <td>
+                        <textarea id="zen_cortext_header_code" name="zen_cortext_header_code" rows="6" class="large-text code" spellcheck="false" placeholder="&lt;!-- e.g. Google Tag Manager / GA4 / verification meta --&gt;"><?php echo esc_textarea($header_code); ?></textarea>
+                        <p class="description"><?php esc_html_e('Printed inside <head>, as high as possible. Best for tag managers, analytics loaders, and <meta> verification tags.', 'zen-cortext'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="zen_cortext_body_code"><?php esc_html_e('Body code', 'zen-cortext'); ?></label></th>
+                    <td>
+                        <textarea id="zen_cortext_body_code" name="zen_cortext_body_code" rows="6" class="large-text code" spellcheck="false" placeholder="&lt;!-- e.g. GTM &lt;noscript&gt; fallback --&gt;"><?php echo esc_textarea($body_code); ?></textarea>
+                        <p class="description"><?php esc_html_e('Printed immediately after the opening <body> tag. Best for the GTM <noscript> fallback.', 'zen-cortext'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="zen_cortext_footer_code"><?php esc_html_e('Footer code', 'zen-cortext'); ?></label></th>
+                    <td>
+                        <textarea id="zen_cortext_footer_code" name="zen_cortext_footer_code" rows="6" class="large-text code" spellcheck="false" placeholder="&lt;!-- e.g. deferred trackers / chat widgets --&gt;"><?php echo esc_textarea($footer_code); ?></textarea>
+                        <p class="description"><?php esc_html_e('Printed just before the closing </body> tag. Best for deferred scripts and third-party widgets.', 'zen-cortext'); ?></p>
                     </td>
                 </tr>
             </table>

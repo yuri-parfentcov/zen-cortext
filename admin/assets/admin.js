@@ -48,10 +48,9 @@
         const $result = $('#zen-cortext-test-result').removeClass('ok err').text('Testing…');
         $btn.prop('disabled', true);
 
-        // Test the values currently TYPED in the form, not the values
-        // already saved in the DB. Otherwise users have to "Save → Test →
-        // realise it was wrong → Save again", which is awful UX.
-        const $processor = $('input[name="zen_cortext_processor"]:checked');
+        // Test the API key currently TYPED in the form, not the value already
+        // saved in the DB. Otherwise users have to "Save → Test → realise it
+        // was wrong → Save again", which is awful UX.
         $.ajax({
             url: cfg.ajaxUrl,
             method: 'POST',
@@ -59,10 +58,7 @@
             data: {
                 action:    'zen_cortext_test_connection',
                 nonce:     cfg.nonce,
-                processor: $processor.length ? $processor.val() : '',
-                api_key:   $('#zen_cortext_api_key').val() || '',
-                cli_path:  $('#zen_cortext_cli_path').val() || '',
-                cli_model: $('#zen_cortext_cli_model').val() || ''
+                api_key:   $('#zen_cortext_api_key').val() || ''
             }
         }).done(function (resp) {
             if (resp.success) {

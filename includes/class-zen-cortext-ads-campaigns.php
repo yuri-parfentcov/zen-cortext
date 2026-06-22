@@ -46,7 +46,7 @@ class Zen_Cortext_Ads_Campaigns {
         global $wpdb;
         $upserted = 0;
         $errors   = array();
-        $seen_ids = array();
+        $seen_row_ids = array();
 
         if (!is_array($campaigns)) {
             return array('upserted' => 0, 'deleted' => 0, 'errors' => array('campaigns must be an array'));
@@ -60,16 +60,27 @@ class Zen_Cortext_Ads_Campaigns {
                 $errors[] = "row {$i}: not an object";
                 continue;
             }
+            $type          = self::str($c['type'] ?? 'campaign', 16);
+            $type          = ($type === 'group') ? 'group' : 'campaign';
             $campaign_id   = self::str($c['campaign_id']   ?? '', 32);
             $campaign_name = self::str($c['campaign_name'] ?? '', 191);
+            $ad_group_id   = self::str($c['ad_group_id']   ?? '', 32);
+            $ad_group_name = self::str($c['ad_group_name'] ?? '', 191);
             if ($campaign_id === '' || $campaign_name === '') {
                 $errors[] = "row {$i}: campaign_id and campaign_name required";
                 continue;
             }
+            if ($type === 'group' && ($ad_group_id === '' || $ad_group_name === '')) {
+                $errors[] = "row {$i}: ad_group_id and ad_group_name required for group rows";
+                continue;
+            }
 
             $row = array(
+                'type'          => $type,
                 'campaign_id'   => $campaign_id,
                 'campaign_name' => $campaign_name,
+                'ad_group_id'   => $ad_group_id,
+                'ad_group_name' => $ad_group_name,
                 'status'        => self::str($c['status'] ?? '', 16),
                 'budget_micros' => isset($c['budget_micros']) && $c['budget_micros'] !== '' ? (int) $c['budget_micros'] : null,
                 'top_headlines' => self::encode_string_list($c['top_headlines'] ?? array()),
@@ -78,31 +89,32 @@ class Zen_Cortext_Ads_Campaigns {
             );
 
             $existing_id = (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT id FROM {$table} WHERE campaign_id = %s",
-                $campaign_id
+                "SELECT id FROM {$table} WHERE type = %s AND campaign_id = %s AND ad_group_id = %s",
+                $type, $campaign_id, $ad_group_id
             ));
 
             if ($existing_id > 0) {
                 $ok = $wpdb->update($table, $row, array('id' => $existing_id));
+                $row_id = $existing_id;
             } else {
                 $ok = $wpdb->insert($table, $row);
+                $row_id = (int) $wpdb->insert_id;
             }
 
             if ($ok === false) {
                 $errors[] = "row {$i}: db error: " . $wpdb->last_error;
                 continue;
             }
-            $seen_ids[] = $campaign_id;
+            $seen_row_ids[] = $row_id;
             $upserted++;
         }
 
         $deleted = 0;
-        if ($delete_missing && !empty($seen_ids)) {
-            $placeholders = implode(',', array_fill(0, count($seen_ids), '%s'));
-            $sql = "DELETE FROM {$table} WHERE campaign_id NOT IN ({$placeholders})";
-            $deleted = (int) $wpdb->query($wpdb->prepare($sql, $seen_ids));
-        } elseif ($delete_missing && empty($seen_ids)) {
-            // Caller explicitly asked for full-replace with an empty payload.
+        if ($delete_missing && !empty($seen_row_ids)) {
+            $placeholders = implode(',', array_fill(0, count($seen_row_ids), '%d'));
+            $sql = "DELETE FROM {$table} WHERE id NOT IN ({$placeholders})";
+            $deleted = (int) $wpdb->query($wpdb->prepare($sql, $seen_row_ids));
+        } elseif ($delete_missing && empty($seen_row_ids)) {
             $deleted = (int) $wpdb->query("DELETE FROM {$table}");
         }
 
@@ -118,18 +130,26 @@ class Zen_Cortext_Ads_Campaigns {
         $name = trim((string) $name);
         if ($name === '') return null;
         return $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM " . self::table() . " WHERE LOWER(campaign_name) = LOWER(%s) LIMIT 1",
-            $name
+            "SELECT * FROM " . self::table() . "
+             WHERE (type = 'group' AND LOWER(ad_group_name) = LOWER(%s))
+                OR (type = 'campaign' AND LOWER(campaign_name) = LOWER(%s))
+             ORDER BY (type = 'group') DESC, id DESC
+             LIMIT 1",
+            $name, $name
         ), ARRAY_A);
     }
 
-    public static function find_by_id($campaign_id) {
+    public static function find_by_id($entity_id) {
         global $wpdb;
-        $campaign_id = trim((string) $campaign_id);
-        if ($campaign_id === '') return null;
+        $entity_id = trim((string) $entity_id);
+        if ($entity_id === '') return null;
         return $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM " . self::table() . " WHERE campaign_id = %s LIMIT 1",
-            $campaign_id
+            "SELECT * FROM " . self::table() . "
+             WHERE (type = 'group' AND ad_group_id = %s)
+                OR (type = 'campaign' AND campaign_id = %s)
+             ORDER BY (type = 'group') DESC, id DESC
+             LIMIT 1",
+            $entity_id, $entity_id
         ), ARRAY_A);
     }
 
@@ -151,8 +171,8 @@ class Zen_Cortext_Ads_Campaigns {
         global $wpdb;
         $limit = max(1, min(1000, (int) $limit));
         return $wpdb->get_results($wpdb->prepare(
-            "SELECT id, campaign_id, campaign_name, status, budget_micros,
-                    top_headlines, top_keywords, synced_at
+            "SELECT id, type, campaign_id, campaign_name, ad_group_id, ad_group_name,
+                    status, budget_micros, top_headlines, top_keywords, synced_at
              FROM " . self::table() . "
              ORDER BY synced_at DESC, id DESC
              LIMIT %d",
@@ -169,6 +189,17 @@ class Zen_Cortext_Ads_Campaigns {
     public static function count_all() {
         global $wpdb;
         return (int) $wpdb->get_var("SELECT COUNT(*) FROM " . self::table());
+    }
+
+    public static function counts_by_type() {
+        global $wpdb;
+        $rows = $wpdb->get_results("SELECT type, COUNT(*) AS n FROM " . self::table() . " GROUP BY type", ARRAY_A);
+        $out = array('campaign' => 0, 'group' => 0);
+        foreach ((array) $rows as $r) {
+            $t = (isset($r['type']) && $r['type'] === 'group') ? 'group' : 'campaign';
+            $out[$t] = (int) $r['n'];
+        }
+        return $out;
     }
 
     /**

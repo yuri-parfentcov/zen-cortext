@@ -15,9 +15,9 @@
  * inside a code-editor surface. The colors REST endpoint moved with
  * it; only the structural template / CSS endpoints remain here.
  *
- * AI assistance reuses the existing Zen_Cortext_API streaming primitives
- * (stream_chat_via_api / stream_chat_via_cli) — same processor + model
- * pipeline as the admin Brainstorm page.
+ * AI assistance reuses Zen_Cortext_API::stream_internal() — the streaming
+ * Anthropic HTTP API, optionally intercepted by the separate Claude Code CLI
+ * companion plugin — same pipeline as the admin Brainstorm page.
  */
 
 if (!defined('ABSPATH')) {
@@ -74,19 +74,9 @@ class Zen_Cortext_Chat_Editor {
         return $out;
     }
 
-    public static function file_path($filename) {
-        $m = Zen_Cortext_Template_Renderer::meta($filename);
-        return $m ? $m['live'] : null;
-    }
-
-    public static function versions_dir($filename) {
-        $m = Zen_Cortext_Template_Renderer::meta($filename);
-        return $m ? $m['versions'] : null;
-    }
-
-    public static function factory_path($filename) {
-        $m = Zen_Cortext_Template_Renderer::meta($filename);
-        return $m ? $m['factory'] : null;
+    /** True when $filename is a registered, editable template/CSS file. */
+    public static function is_known($filename) {
+        return Zen_Cortext_Template_Renderer::meta($filename) !== null;
     }
 
     /* ================================================================
@@ -227,16 +217,13 @@ class Zen_Cortext_Chat_Editor {
 
     public function rest_get_source($request) {
         $file = (string) $request->get_param('file');
-        $path = self::file_path($file);
-        if (!$path) {
+        if (!self::is_known($file)) {
             return new WP_Error('zen_cortext_chat_editor', 'Unknown template', array('status' => 404));
         }
-        // The live file is in wp-content/uploads/ — if it's missing for
-        // any reason, fall back to the bundled factory copy so the editor
-        // still has source to work with.
-        $source = file_exists($path)
-            ? file_get_contents($path)
-            : (file_exists(self::factory_path($file)) ? file_get_contents(self::factory_path($file)) : '');
+        // Admin-edited source lives in the DB; fall back to the bundled
+        // factory copy when the admin hasn't customized this file.
+        $live   = Zen_Cortext_Template_Renderer::get_live_source($file);
+        $source = ($live !== null) ? $live : Zen_Cortext_Template_Renderer::get_factory_source($file);
         $preview = Zen_Cortext_Template_Renderer::get_preview_source($file);
         return rest_ensure_response(array(
             'file'    => $file,
@@ -250,7 +237,7 @@ class Zen_Cortext_Chat_Editor {
     public function rest_write_preview($request) {
         $file   = (string) $request->get_param('file');
         $source = (string) $request->get_param('source');
-        if (!self::file_path($file)) {
+        if (!self::is_known($file)) {
             return new WP_Error(
                 'zen_cortext_chat_editor',
                 sprintf('Unknown template "%s". Try a hard refresh of the editor.', sanitize_text_field($file)),
@@ -266,7 +253,7 @@ class Zen_Cortext_Chat_Editor {
 
     public function rest_delete_preview($request) {
         $file = (string) $request->get_param('file');
-        if (!self::file_path($file)) {
+        if (!self::is_known($file)) {
             return new WP_Error('zen_cortext_chat_editor', 'Unknown file', array('status' => 400));
         }
         Zen_Cortext_Template_Renderer::delete_preview_source($file);
@@ -278,15 +265,14 @@ class Zen_Cortext_Chat_Editor {
     public function rest_save($request) {
         $file   = (string) $request->get_param('file');
         $source = (string) $request->get_param('source');
-        $path   = self::file_path($file);
-        if (!$path) {
+        if (!self::is_known($file)) {
             return new WP_Error('zen_cortext_chat_editor', 'Unknown file', array('status' => 400));
         }
 
         // Validate per file kind: templates go through the placeholder
         // engine (no raw PHP, balanced blocks, known directives); CSS
         // files only get the no-PHP check. Both reject obvious breakage
-        // before we touch the live file.
+        // before we store the new source.
         $meta = Zen_Cortext_Template_Renderer::meta($file);
         $kind = ($meta && !empty($meta['kind'])) ? $meta['kind'] : 'template';
         $check = Zen_Cortext_Template_Renderer::validate($source, $kind);
@@ -294,20 +280,15 @@ class Zen_Cortext_Chat_Editor {
             return new WP_Error('zen_cortext_chat_editor_lint', $check, array('status' => 400));
         }
 
-        // Snapshot the current published file before overwriting.
-        $snapshot = self::create_version_snapshot($file);
-        if (is_wp_error($snapshot)) return $snapshot;
+        // Snapshot the currently published source into the version history
+        // (capped at 10) before overwriting it.
+        $snapshot = Zen_Cortext_Template_Renderer::add_version_snapshot($file);
 
-        if (file_put_contents($path, $source) === false) {
-            return new WP_Error('zen_cortext_chat_editor', 'Cannot write file', array('status' => 500));
-        }
+        Zen_Cortext_Template_Renderer::set_live_source($file, $source);
 
-        // The published file is now the saved source — drop the staged
+        // The published source is now the saved source — drop the staged
         // draft transient so a refresh shows the canonical version.
         Zen_Cortext_Template_Renderer::delete_preview_source($file);
-
-        // Prune older snapshots beyond the most recent 10.
-        self::prune_versions($file, 10);
 
         return rest_ensure_response(array(
             'saved'   => true,
@@ -317,82 +298,73 @@ class Zen_Cortext_Chat_Editor {
 
     public function rest_list_versions($request) {
         $file = (string) $request->get_param('file');
-        if (!self::file_path($file)) {
+        if (!self::is_known($file)) {
             return new WP_Error('zen_cortext_chat_editor', 'Unknown file', array('status' => 400));
         }
-        return rest_ensure_response(array('versions' => self::list_versions($file)));
+        return rest_ensure_response(array('versions' => Zen_Cortext_Template_Renderer::list_version_ids($file)));
     }
 
     public function rest_get_version_content($request) {
         $file = (string) $request->get_param('file');
         $ts   = (string) $request->get_param('timestamp');
-        if (!self::file_path($file) || !preg_match('/^\d{8}-\d{6}(-\d+)?$/', $ts)) {
+        if (!self::is_known($file) || !preg_match('/^\d{8}-\d{6}(-\d+)?$/', $ts)) {
             return new WP_Error('zen_cortext_chat_editor', 'Bad request', array('status' => 400));
         }
-        $path = self::versions_dir($file) . $file . '.' . $ts;
-        if (!file_exists($path)) {
+        $source = Zen_Cortext_Template_Renderer::get_version_source($file, $ts);
+        if ($source === null) {
             return new WP_Error('zen_cortext_chat_editor', 'Version not found', array('status' => 404));
         }
         return rest_ensure_response(array(
             'file'      => $file,
             'timestamp' => $ts,
-            'source'    => file_get_contents($path),
+            'source'    => $source,
         ));
     }
 
     public function rest_restore_version($request) {
         $file = (string) $request->get_param('file');
         $ts   = (string) $request->get_param('timestamp');
-        if (!self::file_path($file) || !preg_match('/^\d{8}-\d{6}(-\d+)?$/', $ts)) {
+        if (!self::is_known($file) || !preg_match('/^\d{8}-\d{6}(-\d+)?$/', $ts)) {
             return new WP_Error('zen_cortext_chat_editor', 'Bad request', array('status' => 400));
         }
-        $version_path = self::versions_dir($file) . $file . '.' . $ts;
-        if (!file_exists($version_path)) {
+        $source = Zen_Cortext_Template_Renderer::get_version_source($file, $ts);
+        if ($source === null) {
             return new WP_Error('zen_cortext_chat_editor', 'Version not found', array('status' => 404));
         }
-        // Snapshot the current published file before restoring so the
-        // restore action itself is reversible — versions are append-only.
-        $snapshot = self::create_version_snapshot($file);
-        if (is_wp_error($snapshot)) return $snapshot;
-
-        $source = file_get_contents($version_path);
         $meta = Zen_Cortext_Template_Renderer::meta($file);
         $kind = ($meta && !empty($meta['kind'])) ? $meta['kind'] : 'template';
         $check = Zen_Cortext_Template_Renderer::validate($source, $kind);
         if ($check !== true) {
             return new WP_Error('zen_cortext_chat_editor_lint', $check, array('status' => 400));
         }
-        if (file_put_contents(self::file_path($file), $source) === false) {
-            return new WP_Error('zen_cortext_chat_editor', 'Cannot write file', array('status' => 500));
-        }
+        // Snapshot the current published source before restoring so the
+        // restore action itself is reversible — versions are append-only.
+        $snapshot = Zen_Cortext_Template_Renderer::add_version_snapshot($file);
+        Zen_Cortext_Template_Renderer::set_live_source($file, $source);
         // Restore replaces live with a prior version — drop any staged
         // draft so the editor reload shows the version we just restored.
         Zen_Cortext_Template_Renderer::delete_preview_source($file);
-        self::prune_versions($file, 10);
         return rest_ensure_response(array('restored' => true, 'version' => $snapshot));
     }
 
     public function rest_reset_to_factory($request) {
         $file = (string) $request->get_param('file');
-        $live    = self::file_path($file);
-        $factory = self::factory_path($file);
-        if (!$live || !$factory) {
+        if (!self::is_known($file)) {
             return new WP_Error('zen_cortext_chat_editor', 'Unknown file', array('status' => 400));
         }
-        if (!file_exists($factory)) {
+        if (Zen_Cortext_Template_Renderer::get_factory_source($file) === ''
+            && Zen_Cortext_Template_Renderer::get_live_source($file) === null) {
             return new WP_Error('zen_cortext_chat_editor', 'Factory copy is missing for this template', array('status' => 500));
         }
-        // Snapshot the current live file BEFORE overwriting, so the reset
-        // itself is reversible — the admin can pull their edits back from
-        // the version history dropdown if they decide they were better.
-        $snapshot = self::create_version_snapshot($file);
-        if (is_wp_error($snapshot)) return $snapshot;
-        if (!@copy($factory, $live)) {
-            return new WP_Error('zen_cortext_chat_editor', 'Cannot copy factory file over live', array('status' => 500));
-        }
-        // Drop any in-progress draft — the published file is now factory.
+        // Snapshot the current source BEFORE resetting, so the reset itself
+        // is reversible — the admin can pull their edits back from the
+        // version history dropdown if they decide they were better.
+        $snapshot = Zen_Cortext_Template_Renderer::add_version_snapshot($file);
+        // Dropping the stored live source makes the runtime fall back to the
+        // bundled factory copy — i.e. "reset to factory".
+        Zen_Cortext_Template_Renderer::delete_live_source($file);
+        // Drop any in-progress draft — the published source is now factory.
         Zen_Cortext_Template_Renderer::delete_preview_source($file);
-        self::prune_versions($file, 10);
         return rest_ensure_response(array(
             'reset'   => true,
             'version' => $snapshot,
@@ -406,8 +378,7 @@ class Zen_Cortext_Chat_Editor {
         $message     = (string) $request->get_param('message');
         $history_in  = (array)  $request->get_param('history');
         $source      = (string) $request->get_param('source'); // current editor contents
-        $path        = self::file_path($file);
-        if (!$path || trim($message) === '') {
+        if (!self::is_known($file) || trim($message) === '') {
             return new WP_Error('zen_cortext_chat_editor', 'file + message required', array('status' => 400));
         }
 
@@ -442,12 +413,7 @@ class Zen_Cortext_Chat_Editor {
         };
 
         $opts = array('max_tokens' => 8000, 'timeout' => 180);
-        if (Zen_Cortext_API::processor() === 'cli') {
-            $cli_model = (string) get_option('zen_cortext_cli_model', 'sonnet');
-            Zen_Cortext_API::stream_chat_via_cli($system_prompt, $messages, $cli_model, $on_event, $opts);
-        } else {
-            Zen_Cortext_API::stream_chat_via_api($system_prompt, $messages, $on_event, $opts);
-        }
+        Zen_Cortext_API::stream_internal($system_prompt, $messages, $on_event, $opts);
 
         $parsed = self::parse_ai_response($buffer);
         return rest_ensure_response(array(
@@ -460,51 +426,6 @@ class Zen_Cortext_Chat_Editor {
     /* ================================================================
        Helpers
        ================================================================ */
-
-    private static function create_version_snapshot($file) {
-        $path = self::file_path($file);
-        if (!$path || !file_exists($path)) return new WP_Error('zen_cortext_chat_editor', 'Source missing', array('status' => 500));
-        $vdir = self::versions_dir($file);
-        if (!is_dir($vdir) && !wp_mkdir_p($vdir)) return new WP_Error('zen_cortext_chat_editor', 'Cannot create versions dir', array('status' => 500));
-        // Two saves in the same second would collide on second-precision
-        // timestamps and corrupt the earlier snapshot. Append a counter
-        // when needed so each snapshot lives in its own file.
-        $base = gmdate('Ymd-His');
-        $ts   = $base;
-        $i    = 1;
-        while (file_exists($vdir . $file . '.' . $ts)) {
-            $ts = $base . '-' . $i++;
-        }
-        $vpath = $vdir . $file . '.' . $ts;
-        if (!@copy($path, $vpath)) return new WP_Error('zen_cortext_chat_editor', 'Cannot snapshot version', array('status' => 500));
-        return $ts;
-    }
-
-    private static function list_versions($file) {
-        $vdir = self::versions_dir($file);
-        if (!is_dir($vdir)) return array();
-        $entries = @scandir($vdir);
-        if (!is_array($entries)) return array();
-        $out = array();
-        $prefix = $file . '.';
-        foreach ($entries as $e) {
-            if (strpos($e, $prefix) !== 0) continue;
-            $ts = substr($e, strlen($prefix));
-            if (!preg_match('/^\d{8}-\d{6}(-\d+)?$/', $ts)) continue;
-            $out[] = $ts;
-        }
-        rsort($out);
-        return $out;
-    }
-
-    private static function prune_versions($file, $keep) {
-        $vdir = self::versions_dir($file);
-        $list = self::list_versions($file);
-        $extra = array_slice($list, max(0, (int) $keep));
-        foreach ($extra as $ts) {
-            @unlink($vdir . $file . '.' . $ts); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- pruning plugin-managed version snapshot files in the uploads dir.
-        }
-    }
 
     /**
      * System prompt for the AI editor. Treats the request like a code-

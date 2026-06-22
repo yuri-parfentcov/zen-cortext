@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) exit;
         printf(
             /* translators: %s is a <code>-wrapped base URL of the read-only REST API exposed by the plugin. */
             esc_html__('Base URL: %s', 'zen-cortext'),
-            '<code id="zwk-base-url">' . esc_html(home_url('/wp-json/zc/v1')) . '</code>'
+            '<code id="zwk-base-url">' . esc_html(rest_url('zc/v1')) . '</code>'
         );
         ?>
         <br>

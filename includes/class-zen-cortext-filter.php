@@ -39,7 +39,7 @@ class Zen_Cortext_Filter {
     const ANTHROPIC_VERSION  = '2023-06-01';
     const PROMPT_CACHE_BETA  = 'prompt-caching-2024-07-31';
 
-    const ASSISTANT_CONTEXT_CACHE_KEY = 'zc_filter_assistant_context_v1';
+    const ASSISTANT_CONTEXT_CACHE_KEY = 'zen_cortext_filter_assistant_context_v1';
     const ASSISTANT_CONTEXT_CACHE_TTL = 3600; // 1h; cache busts on option updates too.
 
     /**

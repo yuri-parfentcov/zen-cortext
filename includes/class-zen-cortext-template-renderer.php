@@ -50,11 +50,14 @@ class Zen_Cortext_Template_Renderer {
             'chat.tpl.html' => array(
                 'label'    => __('Chat shell (chat.tpl.html)', 'zen-cortext'),
                 'factory'  => $base_views . 'factory/chat.tpl.html',
-                // Live + versions live under wp-content/uploads/ — the
-                // plugin tree is read-only on this host (FrankenPHP runs
-                // under systemd ProtectSystem=strict with only uploads/
-                // and cache/ in ReadWritePaths). Uploads is the standard
-                // WP "writable from PHP" location.
+                // Admin-edited "live" source + version history now live in
+                // the database (wp_options), not on disk — see
+                // get_live_source()/set_live_source(). The factory copy
+                // ships read-only inside the plugin and is the fallback.
+                // `live`/`versions` paths are retained ONLY so the one-time
+                // file→DB migration can find + import + delete pre-2.39.2
+                // uploads copies.
+                'slug'     => 'chat',
                 'live'     => $writable . 'templates/chat.tpl.html',
                 'versions' => $writable . 'versions/chat.tpl.html/',
                 'kind'     => 'template',
@@ -63,20 +66,21 @@ class Zen_Cortext_Template_Renderer {
             'chat-page-body.tpl.html' => array(
                 'label'    => __('Full page wrapper body (chat-page-body.tpl.html)', 'zen-cortext'),
                 'factory'  => $base_pages . 'factory/chat-page-body.tpl.html',
+                'slug'     => 'chat_page_body',
                 'live'     => $writable . 'templates/chat-page-body.tpl.html',
                 'versions' => $writable . 'versions/chat-page-body.tpl.html/',
                 'kind'     => 'template',
                 'mode'     => 'text/html',
             ),
-            // chat.css — the chat's stylesheet. Edited the same way as
-            // templates (live in uploads, factory in plugin tree, versions
-            // dir for snapshots) but skips the placeholder/PHP validator
-            // because CSS source has its own grammar. The shortcode +
-            // wrapper enqueue from the live URL when present, falling
-            // back to the bundled factory CSS otherwise.
+            // chat.css — the chat's stylesheet. Edited the same way as the
+            // templates; the live source lives in the DB. The shortcode +
+            // wrapper enqueue the bundled factory CSS file by default, or
+            // print the customized source as inline CSS when the admin has
+            // saved an edit (see Zen_Cortext_Template_Renderer helpers).
             'chat.css' => array(
                 'label'    => __('Chat stylesheet (chat.css)', 'zen-cortext'),
                 'factory'  => $base_assets . 'factory/chat.css',
+                'slug'     => 'chat_css',
                 'live'     => $writable . 'assets/chat.css',
                 'versions' => $writable . 'versions/chat.css/',
                 'kind'     => 'css',
@@ -89,12 +93,120 @@ class Zen_Cortext_Template_Renderer {
             'email/chat-transcript.html' => array(
                 'label'    => __('Email — chat transcript (email/chat-transcript.html)', 'zen-cortext'),
                 'factory'  => $base_views . 'factory/email/chat-transcript.html',
+                'slug'     => 'email_chat_transcript',
                 'live'     => $writable . 'templates/email/chat-transcript.html',
                 'versions' => $writable . 'versions/email/chat-transcript.html/',
                 'kind'     => 'template',
                 'mode'     => 'text/html',
             ),
         );
+    }
+
+    /* ================================================================
+       Database-backed source storage (replaces on-disk live files)
+       ================================================================ */
+
+    const OPT_SRC_PREFIX = 'zen_cortext_src_';   // live source per file
+    const OPT_VER_PREFIX = 'zen_cortext_ver_';   // version history per file
+    const VERSIONS_KEEP  = 10;
+
+    /** Option key for a file's live source, or null for unknown files. */
+    private static function src_option($name) {
+        $m = self::meta($name);
+        return ($m && !empty($m['slug'])) ? self::OPT_SRC_PREFIX . $m['slug'] : null;
+    }
+
+    /** Option key for a file's version history, or null for unknown files. */
+    private static function ver_option($name) {
+        $m = self::meta($name);
+        return ($m && !empty($m['slug'])) ? self::OPT_VER_PREFIX . $m['slug'] : null;
+    }
+
+    /**
+     * Admin-edited live source for a file, or null when none is stored
+     * (the runtime then falls back to the bundled factory copy).
+     */
+    public static function get_live_source($name) {
+        $key = self::src_option($name);
+        if (!$key) return null;
+        $val = get_option($key, null);
+        return is_string($val) ? $val : null;
+    }
+
+    /** Store admin-edited live source (autoload off — only read on render). */
+    public static function set_live_source($name, $source) {
+        $key = self::src_option($name);
+        if (!$key) return false;
+        return update_option($key, (string) $source, false);
+    }
+
+    /** Drop the live source so the runtime falls back to factory. */
+    public static function delete_live_source($name) {
+        $key = self::src_option($name);
+        return $key ? delete_option($key) : false;
+    }
+
+    /** Factory (bundled, read-only) source for a file, or '' if missing. */
+    public static function get_factory_source($name) {
+        $m = self::meta($name);
+        if (!$m || empty($m['factory']) || !file_exists($m['factory'])) return '';
+        $c = file_get_contents($m['factory']);
+        return is_string($c) ? $c : '';
+    }
+
+    /**
+     * Version history: array of ['ts' => 'Ymd-His', 'source' => '...'],
+     * newest first.
+     */
+    public static function get_versions($name) {
+        $key = self::ver_option($name);
+        if (!$key) return array();
+        $v = get_option($key, array());
+        return is_array($v) ? $v : array();
+    }
+
+    /** List version timestamps (newest first). */
+    public static function list_version_ids($name) {
+        $out = array();
+        foreach (self::get_versions($name) as $row) {
+            if (isset($row['ts'])) $out[] = (string) $row['ts'];
+        }
+        return $out;
+    }
+
+    /** Fetch one version's source by timestamp, or null. */
+    public static function get_version_source($name, $ts) {
+        foreach (self::get_versions($name) as $row) {
+            if (isset($row['ts']) && (string) $row['ts'] === (string) $ts) {
+                return isset($row['source']) ? (string) $row['source'] : '';
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Snapshot the CURRENT live source (or factory when none) into the
+     * version history and return the new timestamp. Caps history at
+     * VERSIONS_KEEP. Returns '' when there is nothing to snapshot.
+     */
+    public static function add_version_snapshot($name) {
+        $key = self::ver_option($name);
+        if (!$key) return '';
+        $current = self::get_live_source($name);
+        if ($current === null) $current = self::get_factory_source($name);
+        if ($current === '') return '';
+
+        $versions = self::get_versions($name);
+        // Unique second-precision timestamp (append a counter on collision).
+        $base = gmdate('Ymd-His');
+        $ts = $base; $i = 1;
+        $existing = self::list_version_ids($name);
+        while (in_array($ts, $existing, true)) { $ts = $base . '-' . $i++; }
+
+        array_unshift($versions, array('ts' => $ts, 'source' => $current));
+        $versions = array_slice($versions, 0, self::VERSIONS_KEEP);
+        update_option($key, $versions, false);
+        return $ts;
     }
 
     /**
@@ -114,23 +226,35 @@ class Zen_Cortext_Template_Renderer {
     }
 
     /**
-     * Public URL for an editable asset — uploads URL if a live copy
-     * exists (admin has saved at least once), otherwise the bundled
-     * factory copy in the plugin tree. Appends a cache-buster keyed
-     * to the live file's mtime so saves invalidate the browser cache
-     * without bumping the global plugin version.
+     * Public URL for the bundled factory copy of an editable asset (used
+     * for chat.css when the admin hasn't customized it — a real file URL is
+     * browser-cacheable). Customized source is served as inline CSS instead
+     * (see enqueue_chat_css), since it lives in the DB, not on disk.
      */
-    public static function asset_url($name) {
+    public static function factory_url($name) {
         $m = self::meta($name);
-        if (!$m) return '';
-        if (file_exists($m['live'])) {
-            $rel = ltrim(substr($m['live'], strlen(self::writable_root())), '/');
-            return self::writable_url() . $rel . '?ver=' . filemtime($m['live']);
+        if (!$m || empty($m['factory'])) return '';
+        // No ?ver here — wp_register_style() appends the version arg, so
+        // returning a bare URL avoids a duplicated cache-buster.
+        $rel = ltrim(substr($m['factory'], strlen(ZEN_CORTEXT_PLUGIN_DIR)), '/');
+        return ZEN_CORTEXT_PLUGIN_URL . $rel;
+    }
+
+    /**
+     * Register the chat stylesheet under $handle (does NOT enqueue — callers
+     * enqueue when the chat actually renders). When the admin has saved a
+     * custom chat.css it is attached as inline CSS (DB-backed, no file), which
+     * prints only once the handle is enqueued; otherwise the bundled factory
+     * chat.css file is registered so it stays browser-cacheable.
+     */
+    public static function register_chat_css($handle) {
+        $custom = self::get_live_source('chat.css');
+        if (is_string($custom) && $custom !== '') {
+            wp_register_style($handle, false, array(), ZEN_CORTEXT_VERSION);
+            wp_add_inline_style($handle, $custom);
+        } else {
+            wp_register_style($handle, self::factory_url('chat.css'), array(), ZEN_CORTEXT_VERSION);
         }
-        // Factory fallback — use the plugin URL.
-        $factory = $m['factory'];
-        $rel     = ltrim(substr($factory, strlen(ZEN_CORTEXT_PLUGIN_DIR)), '/');
-        return ZEN_CORTEXT_PLUGIN_URL . $rel . '?ver=' . ZEN_CORTEXT_VERSION;
     }
 
     /* ----- preview transient (in-progress edits, not on disk) ----- */
@@ -143,7 +267,7 @@ class Zen_Cortext_Template_Renderer {
      */
     public static function preview_transient_key($filename, $user_id = null) {
         if ($user_id === null) $user_id = get_current_user_id();
-        return 'zce_preview_' . (int) $user_id . '_' . md5((string) $filename);
+        return 'zen_cortext_preview_' . (int) $user_id . '_' . md5((string) $filename);
     }
 
     public static function get_preview_source($filename, $user_id = null) {
@@ -190,7 +314,10 @@ class Zen_Cortext_Template_Renderer {
             $preview = self::get_preview_source($name);
             if ($preview !== null) return $preview;
         }
-        if (file_exists($m['live']))    return file_get_contents($m['live']);
+        // Admin-edited source lives in the DB; fall back to the bundled
+        // factory copy when the admin hasn't customized this file.
+        $live = self::get_live_source($name);
+        if ($live !== null) return $live;
         if (file_exists($m['factory'])) return file_get_contents($m['factory']);
         return null;
     }
@@ -205,21 +332,73 @@ class Zen_Cortext_Template_Renderer {
     }
 
     /**
-     * Seed live/<file> from factory/<file> when the live copy is missing,
-     * and create the writable directories under wp-content/uploads/ so
-     * the chat editor's first save doesn't have to mkdir on the hot path.
+     * One-time migration: import any pre-2.39.2 on-disk "live" source and
+     * version files from wp-content/uploads/zen-cortext/ into the database,
+     * then delete the files (editable source no longer lives in uploads —
+     * it belongs in the DB, which isn't publicly readable and survives
+     * plugin upgrades). Idempotent + cheap after the first run (one option
+     * read). Fresh installs simply have no files and fall back to factory.
      */
     public static function ensure_seeded() {
-        foreach (self::registry() as $name => $m) {
-            $live_dir    = dirname($m['live']);
-            $versions    = $m['versions'];
-            if (!is_dir($live_dir)) wp_mkdir_p($live_dir);
-            if (!is_dir($versions)) wp_mkdir_p($versions);
+        if (get_option('zen_cortext_src_db_migrated') === 'done') return;
 
-            if (!file_exists($m['live']) && file_exists($m['factory'])) {
-                @copy($m['factory'], $m['live']);
+        foreach (self::registry() as $name => $m) {
+            // Import the live source file → DB (only if not already in DB).
+            // Skip copies that are byte-identical to the bundled factory file:
+            // those are just the old auto-seeded copy, not a real edit, so we
+            // let them fall back to factory (keeps the DB clean and chat.css
+            // browser-cacheable instead of inlined).
+            if (self::get_live_source($name) === null
+                && !empty($m['live']) && file_exists($m['live'])) {
+                $c = file_get_contents($m['live']);
+                if (is_string($c) && $c !== '' && $c !== self::get_factory_source($name)) {
+                    self::set_live_source($name, $c);
+                }
+            }
+
+            // Import version snapshot files → DB version history (newest first).
+            if (!empty($m['versions']) && is_dir($m['versions'])) {
+                $entries = @scandir($m['versions']);
+                $rows = array();
+                if (is_array($entries)) {
+                    $prefix = basename($name) . '.'; // files are "<file>.<ts>"
+                    $fname  = basename($name);
+                    foreach ($entries as $e) {
+                        if (strpos($e, $fname . '.') !== 0) continue;
+                        $ts = substr($e, strlen($fname) + 1);
+                        if (!preg_match('/^\d{8}-\d{6}(-\d+)?$/', $ts)) continue;
+                        $src = @file_get_contents($m['versions'] . $e);
+                        if (is_string($src)) $rows[] = array('ts' => $ts, 'source' => $src);
+                    }
+                }
+                if ($rows) {
+                    usort($rows, function ($a, $b) { return strcmp($b['ts'], $a['ts']); });
+                    $rows = array_slice($rows, 0, self::VERSIONS_KEEP);
+                    $key = self::ver_option($name);
+                    if ($key && get_option($key, null) === null) {
+                        update_option($key, $rows, false);
+                    }
+                }
+            }
+
+            // Delete the now-migrated on-disk source + version files so no
+            // editable source remains in the uploads folder.
+            if (!empty($m['live']) && file_exists($m['live'])) {
+                @unlink($m['live']); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- removing migrated source file from uploads after import to DB.
+            }
+            if (!empty($m['versions']) && is_dir($m['versions'])) {
+                $entries = @scandir($m['versions']);
+                if (is_array($entries)) {
+                    foreach ($entries as $e) {
+                        if ($e === '.' || $e === '..') continue;
+                        @unlink($m['versions'] . $e); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- removing migrated version snapshot from uploads after import to DB.
+                    }
+                }
+                @rmdir($m['versions']); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- removing the now-empty migrated version-snapshot dir from the plugin's own uploads folder; one-time migration, WP_Filesystem credentials aren't available in this path.
             }
         }
+
+        update_option('zen_cortext_src_db_migrated', 'done', false);
     }
 
     /* ================================================================

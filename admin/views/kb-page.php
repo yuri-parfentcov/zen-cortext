@@ -238,7 +238,9 @@ function zen_cortext_render_type_row($index_or_id, $type, $is_new_row) {
 }
 ?>
 
-<!-- Template for new rows added client-side. Cloned by admin.js. -->
-<script type="text/html" id="zen-cortext-type-row-template">
+<!-- Template for new rows added client-side. Cloned by admin.js via
+     .innerHTML. Uses the inert HTML template element so it is neither
+     rendered nor an executable script. -->
+<template id="zen-cortext-type-row-template">
     <?php zen_cortext_render_type_row('__INDEX__', array(), true); ?>
-</script>
+</template>

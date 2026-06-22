@@ -255,7 +255,7 @@
                       '<button class="zlc-modal-close" id="zlc-sched-close" aria-label="Close">×</button>' +
                     '</div>' +
                     '<div class="zlc-modal-body">' +
-                      '<p class="zlc-modal-hint">Outside this window your status is forced to <strong>offline</strong>. Inside it, normal online/away/reachable rules apply.</p>' +
+                      '<p class="zlc-modal-hint">Outside this window you are shown <strong>offline</strong> once you go idle. While you are actively online here, your manual status still shows to visitors. Inside the window, normal online/away/reachable rules apply.</p>' +
                       '<label class="zlc-field-row">' +
                         '<input type="checkbox" id="zlc-sched-enabled"' + enabledChecked + '> ' +
                         '<span>Enable automatic schedule</span>' +
@@ -817,7 +817,7 @@
             try {
                 new Notification('New visitor message', {
                     body: 'A visitor sent a message in the live chat.',
-                    icon: '/biometrics.png',
+                    icon: (window.zlcConfig && zlcConfig.icon) || undefined,
                     tag: 'zlc-msg-' + activeChatUid
                 });
             } catch (e) {}

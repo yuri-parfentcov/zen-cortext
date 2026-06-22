@@ -1,0 +1,56 @@
+/*
+ * Zen Cortext admin — Saved Chats list page
+ * Moved out of an inline <style> block into an enqueued stylesheet.
+ */
+
+.zen-cortext-wrap .zcc-stats { margin: 12px 0 18px; }
+.zen-cortext-wrap .zcc-stats th { text-align: left; padding: 6px 12px; width: 260px; }
+.zen-cortext-wrap .zcc-stats td { padding: 6px 12px; }
+.zen-cortext-wrap .zcc-filters { margin: 16px 0; }
+.zen-cortext-wrap .zcc-list .zcc-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    background: #f0f6fc; color: #1d2327; font-size: 11px; font-weight: 600;
+    max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    vertical-align: middle;
+}
+.zen-cortext-wrap .zcc-list .zcc-pill-empty { color: #aaa; font-size: 11px; }
+.zen-cortext-wrap .zcc-list .zcc-row-actions { text-align: right; white-space: nowrap; }
+
+.zen-cortext-wrap .zcc-list tr.zcc-deleted td { background: #fafafa; color: #888; }
+.zen-cortext-wrap .zcc-list .zcc-lead-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 10px;
+    background: #e7f3d4;
+    color: #3a5c1a;
+    font-size: 11px;
+    font-weight: 600;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.zen-cortext-wrap .zcc-list .zcc-lead-sub {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.zen-cortext-wrap .zcc-list tr.zcc-deleted td a { color: #888; }
+.zen-cortext-wrap .zcc-list tr.zcc-deleted td > a strong { text-decoration: line-through; }
+.zen-cortext-wrap .zcc-list .zcc-badge-deleted {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #d63638;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+}

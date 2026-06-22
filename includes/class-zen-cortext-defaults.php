@@ -48,9 +48,6 @@ class Zen_Cortext_Defaults {
     public static function all() {
         return array(
             'zen_cortext_api_key'                       => '',
-            'zen_cortext_processor'                     => 'api',
-            'zen_cortext_cli_path'                      => 'claude',
-            'zen_cortext_cli_model'                     => 'sonnet',
             'zen_cortext_model'                         => 'claude-sonnet-4-6',
             'zen_cortext_classify_model'                => 'claude-sonnet-4-6',
             'zen_cortext_max_tokens'                    => 2048,

@@ -8,7 +8,7 @@
  * decisions don't live inside a code-editor surface.
  *
  * Stored as the `zen_cortext_chat_colors` WP option — the same option
- * the public render reads via Zen_Cortext_Shortcode::build_color_override_style(),
+ * the public render reads via Zen_Cortext_Shortcode::build_color_override_css(),
  * so the option name and value shape MUST match what the old editor
  * wrote. No data migration needed.
  */
@@ -62,6 +62,11 @@ class Zen_Cortext_Design {
         // so wp_footer doesn't waste a call to the renderer when the
         // feature is off.
         add_action('wp_footer', array($this, 'maybe_render_float_button'), 30);
+
+        // Float-button CSS is registered + attached via wp_add_inline_style
+        // on the same gating, so the scoped styles go through the enqueue
+        // pipeline instead of a hand-written <style> block in the footer.
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_float_button'));
     }
 
     /**
@@ -120,6 +125,15 @@ class Zen_Cortext_Design {
             ZEN_CORTEXT_VERSION
         );
 
+        // Design-tab-specific styles (float-button form + responsive grid),
+        // moved out of inline <style> blocks in _design-tab.php.
+        wp_enqueue_style(
+            'zen-cortext-design-tab',
+            ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/design-tab.css',
+            array('zen-cortext-chat-editor'),
+            ZEN_CORTEXT_VERSION
+        );
+
         // Enqueue the public chat stylesheet too so the Live preview
         // block uses the same selectors that ship to visitors. Without
         // this, intro card / chip / share button styles would be invisible
@@ -127,13 +141,11 @@ class Zen_Cortext_Design {
         // The .zce-mini-chat overrides in chat-editor.css constrain the
         // size so we still get a compact preview, not the full 760px
         // chat layout.
-        $chat_css_url = Zen_Cortext_Template_Renderer::asset_url('chat.css');
-        wp_enqueue_style(
-            'zen-cortext-chat-public',
-            $chat_css_url,
-            array(),
-            ZEN_CORTEXT_VERSION
-        );
+        // chat.css lives in the DB now: factory file when uncustomized,
+        // inline source otherwise. register_chat_css() registers the handle;
+        // enqueue prints it (and its inline CSS, if any) on this page.
+        Zen_Cortext_Template_Renderer::register_chat_css('zen-cortext-chat-public');
+        wp_enqueue_style('zen-cortext-chat-public');
 
         // WP media uploader for the float-button icon picker — opens
         // the standard media library modal so admins can pick any
@@ -489,6 +501,19 @@ class Zen_Cortext_Design {
     }
 
     /**
+     * Single source of truth for the plugin's brand icon — the admin's
+     * Design → float-button icon setting, falling back to the bundled
+     * plugin asset when unset. Drives the float button, the standalone
+     * chat page's mobile trigger, the live-chat PWA touch icon, and push
+     * notification icons so they all stay in sync without hardcoded paths.
+     */
+    public static function brand_icon_url() {
+        $fb   = self::get_float_button();
+        $icon = isset($fb['icon_url']) ? trim((string) $fb['icon_url']) : '';
+        return $icon !== '' ? $icon : plugins_url('public/assets/chat.png', ZEN_CORTEXT_PLUGIN_FILE);
+    }
+
+    /**
      * Resolve the target URL the button should link to. Order of
      * preference: explicit target_page_id → first detected visitor
      * chat page → first detected chat page of any kind → home_url.
@@ -528,114 +553,150 @@ class Zen_Cortext_Design {
      * admin side, feed requests, and the chat pages themselves so the
      * button doesn't shadow the actual chat on its own page.
      */
-    public function maybe_render_float_button() {
-        if (is_admin() || is_feed() || is_robots()) return;
+    /**
+     * Shared gate for the float button — returns the settings array when
+     * the button should render on the current request, or null. Used by
+     * both the wp_enqueue_scripts CSS pass and the wp_footer markup pass.
+     */
+    private static function float_button_render_settings() {
+        if (is_admin() || is_feed() || is_robots()) return null;
         $settings = self::get_float_button();
-        if (empty($settings['enabled'])) return;
+        if (empty($settings['enabled'])) return null;
 
         // Skip on the chat pages themselves — the button pointing at
         // the page you're already on is just noise.
         if (is_singular('page')) {
             $current_id = get_queried_object_id();
-            $pages      = self::list_chat_pages();
-            foreach ($pages as $p) {
-                if ((int) $p['id'] === (int) $current_id) return;
+            foreach (self::list_chat_pages() as $p) {
+                if ((int) $p['id'] === (int) $current_id) return null;
             }
         }
-
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- build_float_button_html() already escapes its inputs (esc_url on URLs, hex regex on $button_color, int-clamp on $padding, enum check on positions) and emits a scoped <style> block that wp_kses_post would strip.
-        echo self::build_float_button_html($settings);
+        return $settings;
     }
 
     /**
-     * Render the float-button HTML + scoped CSS. Position values are
-     * already validated at save time, so we can drop them straight into
-     * the inline style block without re-sanitizing. Icon URL went
-     * through esc_url_raw at save; we re-escape on output as
-     * defense-in-depth.
+     * Register a src-less style handle and attach the scoped float-button
+     * CSS to it via wp_add_inline_style(). Same gating as the markup so we
+     * never ship styles for a button that won't render.
      */
-    public static function build_float_button_html($settings) {
+    public function enqueue_float_button() {
+        $settings = self::float_button_render_settings();
+        if (!$settings) return;
+        wp_register_style('zen-cortext-float-button', false, array(), ZEN_CORTEXT_VERSION);
+        wp_enqueue_style('zen-cortext-float-button');
+        wp_add_inline_style('zen-cortext-float-button', self::build_float_button_css($settings));
+    }
+
+    public function maybe_render_float_button() {
+        $settings = self::float_button_render_settings();
+        if (!$settings) return;
+
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- build_float_button_markup() escapes every dynamic value (esc_url on URLs, esc_attr/esc_html on text); wp_kses_post would strip the <img> alt and aria attrs.
+        echo self::build_float_button_markup($settings);
+    }
+
+    /**
+     * Resolve + re-validate float-button settings into the concrete values
+     * shared by the CSS and the markup. Position/enum values are validated
+     * at save time; we re-validate here so a bad value in storage never
+     * reaches inline CSS or an attribute. URLs are stored raw and escaped
+     * at output (markup); $button_color is hex-validated for CSS context.
+     */
+    private static function resolve_float_button($settings) {
         $vertical   = in_array($settings['vertical'], array('top','middle','bottom'), true) ? $settings['vertical'] : 'bottom';
         $horizontal = in_array($settings['horizontal'], array('left','right'), true)        ? $settings['horizontal'] : 'right';
         $padding    = max(0, min(200, (int) $settings['padding']));
-        $icon_url   = esc_url((string) $settings['icon_url']);
-        if ($icon_url === '') $icon_url = esc_url(ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.png');
+        $icon_url   = trim((string) $settings['icon_url']);
+        if ($icon_url === '') $icon_url = ZEN_CORTEXT_PLUGIN_URL . 'public/assets/chat.png';
         $hover_text = trim((string) $settings['hover_text']);
         if ($hover_text === '') $hover_text = __('Talk to our AI consultant', 'zen-cortext');
-        $target_url = esc_url(self::float_button_target_url($settings));
-        // Re-validate hex on render so a bad value in storage never lands
-        // inline-CSS as something exploitable. White fallback matches the
-        // default and keeps the button visible with any icon.
+        $target_url = self::float_button_target_url($settings);
+        // White fallback matches the default and keeps the button visible.
         $button_color = (string) ($settings['button_color'] ?? '');
         if (!preg_match('/^#[0-9a-fA-F]{3,8}$/', $button_color)) $button_color = '#ffffff';
 
-        // Position rules — `middle` is centered vertically via translate.
-        $pos_v = $vertical === 'top'    ? 'top: '    . $padding . 'px;'
-               : ($vertical === 'bottom' ? 'bottom: ' . $padding . 'px;'
-               : 'top: 50%; transform: translateY(-50%);');
-        $pos_h = $horizontal === 'left' ? 'left: '  . $padding . 'px;'
-                                        : 'right: ' . $padding . 'px;';
-        $tooltip_origin = $horizontal === 'left' ? 'left: calc(100% + 12px);' : 'right: calc(100% + 12px);';
-        $tooltip_arrow_side = $horizontal === 'left' ? 'right: 100%;' : 'left: 100%;';
+        return array(
+            'horizontal'         => $horizontal,
+            'icon_url'           => $icon_url,
+            'hover_text'         => $hover_text,
+            'target_url'         => $target_url,
+            'button_color'       => $button_color,
+            // `middle` is centered vertically via translate.
+            'pos_v'              => $vertical === 'top'    ? 'top: '    . $padding . 'px;'
+                                  : ($vertical === 'bottom' ? 'bottom: ' . $padding . 'px;'
+                                  : 'top: 50%; transform: translateY(-50%);'),
+            'pos_h'              => $horizontal === 'left' ? 'left: '  . $padding . 'px;'
+                                                          : 'right: ' . $padding . 'px;',
+            'tooltip_origin'     => $horizontal === 'left' ? 'left: calc(100% + 12px);' : 'right: calc(100% + 12px);',
+            'tooltip_arrow_side' => $horizontal === 'left' ? 'right: 100%;' : 'left: 100%;',
+        );
+    }
 
-        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
-        // The inline-CSS echoes in this <style> block are in CSS context,
-        // not HTML attribute context. Inputs are: integer-clamped $padding
-        // (0-200), enum-checked vertical/horizontal, hex-regex $button_color,
-        // and hardcoded literals. esc_attr() here would mangle quotes /
-        // commas / parens if any future tweak introduces them — cf. the
-        // 'Yanone Kaffeesatz' font-family bug on the chat-page template.
+    /**
+     * Scoped CSS for the float button, attached via wp_add_inline_style().
+     * Every interpolated value is CSS-context only: integer-clamped padding,
+     * enum-checked positions, hex-regex color — never attribute context.
+     */
+    public static function build_float_button_css($settings) {
+        $r = self::resolve_float_button($settings);
+        $arrow_color = $r['horizontal'] === 'left'
+            ? 'border-right-color: #1d2327;'
+            : 'border-left-color: #1d2327;';
+        return '
+.zcfb-wrap { position: fixed; z-index: 2147483600; ' . $r['pos_v'] . ' ' . $r['pos_h'] . ' }
+.zcfb-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 64px; height: 64px; border-radius: 50%;
+    background: ' . $r['button_color'] . ';
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    text-decoration: none;
+}
+.zcfb-btn:hover, .zcfb-btn:focus-visible {
+    transform: scale(1.06); box-shadow: 0 6px 22px rgba(0,0,0,0.24); outline: none;
+}
+/* Icon sits centered at 60% of the circle so it does not touch the edge.
+   `contain` keeps non-square uploads from being cropped. */
+.zcfb-btn img { width: 60%; height: 60%; display: block; object-fit: contain; }
+.zcfb-tip {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    ' . $r['tooltip_origin'] . '
+    background: #1d2327; color: #fff; padding: 8px 12px; border-radius: 6px;
+    font-size: 13px; line-height: 1.2; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
+}
+.zcfb-tip::after {
+    content: \'\'; position: absolute; top: 50%; transform: translateY(-50%);
+    ' . $r['tooltip_arrow_side'] . '
+    border: 6px solid transparent;
+    ' . $arrow_color . '
+}
+.zcfb-wrap:hover .zcfb-tip,
+.zcfb-wrap:focus-within .zcfb-tip { opacity: 1; }
+@media (max-width: 480px) {
+    .zcfb-btn { width: 56px; height: 56px; }
+    .zcfb-tip { display: none; }  /* tap-only on mobile — no hover */
+}';
+    }
+
+    /**
+     * Float-button markup only — the scoped CSS is enqueued separately via
+     * build_float_button_css() + wp_add_inline_style(). Every dynamic value
+     * is escaped here at output.
+     */
+    public static function build_float_button_markup($settings) {
+        $r = self::resolve_float_button($settings);
         ob_start();
         ?>
-        <style id="zcfb-style">
-        .zcfb-wrap { position: fixed; z-index: 2147483600; <?php echo $pos_v . ' ' . $pos_h; ?> }
-        .zcfb-btn {
-            display: flex; align-items: center; justify-content: center;
-            width: 64px; height: 64px; border-radius: 50%;
-            background: <?php echo $button_color; ?>;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-            text-decoration: none;
-        }
-        .zcfb-btn:hover, .zcfb-btn:focus-visible {
-            transform: scale(1.06); box-shadow: 0 6px 22px rgba(0,0,0,0.24); outline: none;
-        }
-        /* Icon sits centered at 60% of the circle so it doesn't touch
-           the edge. `contain` keeps non-square uploads from being
-           cropped — the inset gives them room to breathe. */
-        .zcfb-btn img { width: 60%; height: 60%; display: block; object-fit: contain; }
-        .zcfb-tip {
-            position: absolute; top: 50%; transform: translateY(-50%);
-            <?php echo $tooltip_origin; ?>
-            background: #1d2327; color: #fff; padding: 8px 12px; border-radius: 6px;
-            font-size: 13px; line-height: 1.2; white-space: nowrap;
-            opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
-        }
-        .zcfb-tip::after {
-            content: ''; position: absolute; top: 50%; transform: translateY(-50%);
-            <?php echo $tooltip_arrow_side; ?>
-            border: 6px solid transparent;
-            <?php echo $horizontal === 'left'
-                ? 'border-right-color: #1d2327;'
-                : 'border-left-color: #1d2327;'; ?>
-        }
-        .zcfb-wrap:hover .zcfb-tip,
-        .zcfb-wrap:focus-within .zcfb-tip { opacity: 1; }
-        @media (max-width: 480px) {
-            .zcfb-btn { width: 56px; height: 56px; }
-            .zcfb-tip { display: none; }  /* tap-only on mobile — no hover */
-        }
-        </style>
         <div class="zcfb-wrap" id="zcfb-wrap">
-            <a href="<?php echo esc_url($target_url); ?>" class="zcfb-btn"
-               aria-label="<?php echo esc_attr($hover_text); ?>"
-               title="<?php echo esc_attr($hover_text); ?>">
-                <img src="<?php echo esc_url($icon_url); ?>" alt="" />
+            <a href="<?php echo esc_url($r['target_url']); ?>" class="zcfb-btn"
+               aria-label="<?php echo esc_attr($r['hover_text']); ?>"
+               title="<?php echo esc_attr($r['hover_text']); ?>">
+                <img src="<?php echo esc_url($r['icon_url']); ?>" alt="" />
             </a>
-            <span class="zcfb-tip" role="tooltip"><?php echo esc_html($hover_text); ?></span>
+            <span class="zcfb-tip" role="tooltip"><?php echo esc_html($r['hover_text']); ?></span>
         </div>
         <?php
         return ob_get_clean();
-        // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
     }
 }

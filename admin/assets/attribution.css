@@ -1,0 +1,37 @@
+/*
+ * Zen Cortext admin — Attribution Context page
+ * Moved out of an inline <style> block into an enqueued stylesheet.
+ */
+
+.zen-cortext-attribution .zat-synced-preview {
+    background: #f6f7f7;
+    border-left: 4px solid #2271b1;
+    padding: 14px 18px;
+    margin: 16px 0 24px 0;
+}
+.zen-cortext-attribution .zat-synced-preview h4 { margin: 0 0 4px 0; }
+.zen-cortext-attribution .zat-synced-preview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 12px;
+}
+.zen-cortext-attribution .zat-synced-preview-grid h5 {
+    margin: 0 0 6px 0;
+    font-size: 13px;
+}
+.zen-cortext-attribution .zat-synced-preview-grid h5 .count {
+    color: #757575;
+    font-weight: normal;
+}
+.zen-cortext-attribution .zat-synced-preview ul {
+    margin: 0;
+    padding-left: 18px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    padding: 8px 8px 8px 26px;
+}
+.zen-cortext-attribution .zat-synced-preview li { margin-bottom: 2px; }

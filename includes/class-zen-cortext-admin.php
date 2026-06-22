@@ -39,6 +39,7 @@ if (!defined('ABSPATH')) {
 class Zen_Cortext_Admin {
 
     private static $instance = null;
+    private $init_hook = '';
     private $kb_hook = '';
     private $chat_hook = '';
     private $chats_hook = '';
@@ -387,9 +388,9 @@ class Zen_Cortext_Admin {
         // Connection tab — backend choice + credentials + model settings.
         $g = 'zen_cortext_connection';
         register_setting($g, 'zen_cortext_api_key',         array('sanitize_callback' => array($this, 'sanitize_api_key')));
-        register_setting($g, 'zen_cortext_processor',       array('sanitize_callback' => array($this, 'sanitize_processor')));
-        register_setting($g, 'zen_cortext_cli_path',        array('sanitize_callback' => 'sanitize_text_field'));
-        register_setting($g, 'zen_cortext_cli_model',       array('sanitize_callback' => 'sanitize_text_field'));
+        // The Claude Code CLI processor (proc_open) is not part of this
+        // plugin — it ships as a separate companion plugin which registers
+        // its own zen_cortext_processor / cli_path / cli_model settings.
         register_setting($g, 'zen_cortext_model',           array('sanitize_callback' => 'sanitize_text_field'));
         register_setting($g, 'zen_cortext_classify_model',  array('sanitize_callback' => 'sanitize_text_field'));
         register_setting($g, 'zen_cortext_max_tokens',      array('sanitize_callback' => array($this, 'sanitize_max_tokens')));
@@ -417,7 +418,7 @@ class Zen_Cortext_Admin {
         // content decision; the prompt template that wraps it lives on
         // the Prompts tab).
         $g = 'zen_cortext_chat_basic';
-        register_setting($g, 'zen_cortext_welcome_message',     array('sanitize_callback' => array($this, 'sanitize_textarea')));
+        register_setting($g, 'zen_cortext_welcome_message',     array('sanitize_callback' => 'sanitize_textarea_field'));
         register_setting($g, 'zen_cortext_intro_card',          array('sanitize_callback' => array($this, 'sanitize_intro_card')));
         register_setting($g, 'zen_cortext_default_chips',       array('sanitize_callback' => array($this, 'sanitize_default_chips')));
         register_setting($g, 'zen_cortext_default_survey_id',   array('sanitize_callback' => 'absint'));
@@ -454,6 +455,32 @@ class Zen_Cortext_Admin {
         $g = 'zen_cortext_sessions';
         register_setting($g, 'zen_cortext_sessions_enabled',         array('sanitize_callback' => 'rest_sanitize_boolean'));
         register_setting($g, 'zen_cortext_sessions_gdpr_compliant',  array('sanitize_callback' => 'rest_sanitize_boolean'));
+
+        // Custom Header / Body / Footer code injected into the standalone chat
+        // templates (which skip wp_head()/wp_footer()). Raw markup by design;
+        // capability-gated in sanitize_custom_code().
+        register_setting($g, 'zen_cortext_header_code', array('sanitize_callback' => array($this, 'sanitize_custom_code')));
+        register_setting($g, 'zen_cortext_body_code',   array('sanitize_callback' => array($this, 'sanitize_custom_code')));
+        register_setting($g, 'zen_cortext_footer_code', array('sanitize_callback' => array($this, 'sanitize_custom_code')));
+    }
+
+    /**
+     * Sanitize the custom Header/Body/Footer code fields.
+     *
+     * These intentionally hold raw markup (GTM/GA4/Pixel <script> tags, the GTM
+     * <noscript> iframe, verification <meta> tags). Stored verbatim ONLY for
+     * users who hold `unfiltered_html` (administrators on single-site, super
+     * admins on multisite) — the same capability core requires to save the
+     * Custom HTML widget, and the standard model used by header/footer-code
+     * plugins. For anyone else the value is filtered through wp_kses_post(),
+     * which strips <script>/<iframe> and dangerous attributes.
+     */
+    public function sanitize_custom_code($value) {
+        $value = is_string($value) ? wp_unslash($value) : '';
+        if (current_user_can('unfiltered_html')) {
+            return $value;
+        }
+        return wp_kses_post($value);
     }
 
     /**
@@ -743,13 +770,22 @@ class Zen_Cortext_Admin {
         return preg_replace('/[^\x20-\x7E]/', '', $value);
     }
 
+    /**
+     * Sanitize an AI prompt / template field. These carry custom
+     * angle-bracket template tokens the model relies on (e.g.
+     * <active_interview_script> in the survey template, <<categories>> in
+     * the classify prompt) and are sent to the AI as JSON-encoded text —
+     * they are never echoed as HTML (the admin form renders them through
+     * esc_textarea()). So we sanitize WITHOUT the tag-stripping that
+     * sanitize_textarea_field() would apply (which would corrupt the
+     * tokens): unslash, drop invalid UTF-8, and strip control characters
+     * (keeping tab / newline / carriage return).
+     */
     public function sanitize_textarea($value) {
-        // Allow newlines and most punctuation; strip slashes WP added.
-        return wp_unslash((string) $value);
-    }
-
-    public function sanitize_processor($value) {
-        return in_array($value, array('api', 'cli'), true) ? $value : 'api';
+        $value = wp_unslash((string) $value);
+        $value = wp_check_invalid_utf8($value);
+        $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $value);
+        return (string) $value;
     }
 
     /**
@@ -778,21 +814,13 @@ class Zen_Cortext_Admin {
         return array(
             'name'     => sanitize_text_field($value['name'] ?? ''),
             'role'     => sanitize_text_field($value['role'] ?? ''),
-            'body'     => wp_unslash((string)($value['body'] ?? '')),
+            // The intro-card body is rendered as HTML in the chat (its
+            // body_html is injected via innerHTML), so it must be filtered
+            // to the safe post-content tag set on input.
+            'body'     => wp_kses_post(wp_unslash((string)($value['body'] ?? ''))),
             'logo_url' => esc_url_raw($value['logo_url'] ?? ''),
             'site_url' => esc_url_raw($value['site_url'] ?? ''),
         );
-    }
-
-    public function sanitize_restructure_prompts($value) {
-        if (!is_array($value)) return Zen_Cortext_Defaults::restructure_prompts();
-        $clean = array();
-        foreach (array('case_study', 'technical_article', 'marketing', 'faq', 'general_info') as $key) {
-            if (isset($value[$key])) {
-                $clean[$key] = wp_unslash((string) $value[$key]);
-            }
-        }
-        return $clean;
     }
 
     public function enqueue($hook) {
@@ -801,6 +829,7 @@ class Zen_Cortext_Admin {
         // and matching neutral palette. No JS (uses native <details>).
         if (!empty($this->init_hook) && $hook === $this->init_hook) {
             wp_enqueue_style('zen-cortext-admin', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/admin.css', array(), ZEN_CORTEXT_VERSION);
+            wp_enqueue_style('zen-cortext-getting-started', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/getting-started.css', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION);
             return;
         }
 
@@ -838,12 +867,65 @@ class Zen_Cortext_Admin {
             'nonce'               => wp_create_nonce('zen_cortext_admin'),
             'artifactChatRestUrl' => rest_url('zen-cortext/v1/artifact-chat'),
             'restNonce'           => wp_create_nonce('wp_rest'),
+            // Base admin URL for a single chat view — sessions.js appends
+            // the chat id to build "View" links into the Saved Chats page.
+            'chatBaseUrl'         => admin_url('admin.php?page=zen-cortext-chats&action=view&id='),
+            // REST endpoint for the "Adapt system prompt" modal (chat-prompts.js).
+            'adaptSystemPromptUrl'=> esc_url_raw(rest_url('zen-cortext/v1/admin/adapt-system-prompt')),
             // Localized for the artifacts editor JS. Unified with KB
             // content types — admin edits the list on the Knowledge Base
             // tab, the artifact dropdown reflects it on next page load.
             'artifactTypes'       => Zen_Cortext_KB_Types::labels(),
             'invitableUsers'      => self::get_invitable_users_for_js(),
         ));
+
+        // Per-page CSS/JS that used to live in inline <style>/<script>
+        // blocks inside the view files. All depend on the shared admin
+        // bundle (admin.css for styling, zenCortextAdmin for ajaxUrl/nonce).
+
+        // Saved Chats — list view vs single chat detail (same hook).
+        if ($hook === $this->chats_hook) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing check to pick which asset bundle to enqueue.
+            $is_detail = isset($_GET['action']) && $_GET['action'] === 'view';
+            if ($is_detail) {
+                wp_enqueue_style('zen-cortext-chat-detail', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/chat-detail.css', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION);
+                wp_enqueue_script('zen-cortext-chat-detail', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/chat-detail.js', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION, true);
+            } else {
+                wp_enqueue_style('zen-cortext-chats', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/chats.css', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION);
+                wp_enqueue_script('zen-cortext-chats', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/chats.js', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION, true);
+            }
+        }
+
+        // User Sessions list.
+        if ($hook === $this->sessions_hook) {
+            wp_enqueue_style('zen-cortext-sessions', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/sessions.css', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION);
+            wp_enqueue_script('zen-cortext-sessions', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/sessions.js', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION, true);
+        }
+
+        // Chat editor settings page — rail + prompts tab behaviors.
+        if ($hook === $this->chat_hook) {
+            wp_enqueue_script('zen-cortext-chat-rail', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/chat-rail.js', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION, true);
+            wp_enqueue_script('zen-cortext-chat-prompts', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/chat-prompts.js', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION, true);
+        }
+
+        // Attribution Context page styles.
+        if ($hook === $this->attribution_hook) {
+            wp_enqueue_style('zen-cortext-attribution', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/attribution.css', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION);
+        }
+
+        // Ads Sync page styles.
+        if ($hook === $this->ads_sync_hook) {
+            wp_enqueue_style('zen-cortext-ads-sync', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/ads-sync.css', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION);
+        }
+
+        // API page — Docs tab styles (the docs tab is otherwise JS-free).
+        if ($hook === $this->api_hook) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab check to scope a stylesheet.
+            $api_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'keys';
+            if ($api_tab === 'docs') {
+                wp_enqueue_style('zen-cortext-api-docs', ZEN_CORTEXT_PLUGIN_URL . 'admin/assets/api-docs.css', array('zen-cortext-admin'), ZEN_CORTEXT_VERSION);
+            }
+        }
 
 
         // Dedicated bundle for Attribution Context + Ads Sync pages.
@@ -930,7 +1012,7 @@ class Zen_Cortext_Admin {
                     'zenCortextApiKeys',
                     array(
                         'scopes'   => Zen_Cortext_Api_Keys::scope_catalog(),
-                        'apiBase'  => esc_url_raw(home_url('/wp-json/zc/v1')),
+                        'apiBase'  => esc_url_raw(rest_url('zc/v1')),
                     )
                 );
             }
@@ -1204,14 +1286,12 @@ class Zen_Cortext_Admin {
 
     public function ajax_test_connection() {
         $this->check_request();
-        // Accept the form values currently typed on the Settings page so the
-        // user can validate a key/CLI path BEFORE saving — much better than
-        // "save → test → it failed → retype → save again".
+        // Accept the API key currently typed on the Settings page so the user
+        // can validate it BEFORE saving. (A companion CLI plugin handles its
+        // own backend test via the zen_cortext_test_connection filter, and
+        // may read additional $_POST overrides it forwards itself.)
         $overrides = array();
-        if (isset($_POST['processor'])) $overrides['processor'] = sanitize_text_field(wp_unslash($_POST['processor']));
-        if (isset($_POST['api_key']))   $overrides['api_key']   = wp_unslash((string) $_POST['api_key']);
-        if (isset($_POST['cli_path']))  $overrides['cli_path']  = sanitize_text_field(wp_unslash($_POST['cli_path']));
-        if (isset($_POST['cli_model'])) $overrides['cli_model'] = sanitize_text_field(wp_unslash($_POST['cli_model']));
+        if (isset($_POST['api_key'])) $overrides['api_key'] = wp_unslash((string) $_POST['api_key']);
         $result = Zen_Cortext_API::test_connection($overrides);
         wp_send_json($result);
     }
@@ -1308,11 +1388,15 @@ class Zen_Cortext_Admin {
      */
     public function ajax_types_save() {
         $this->check_request();
-        $raw = isset($_POST['types']) ? wp_unslash($_POST['types']) : '';
+        $raw = isset($_POST['types']) ? wp_unslash((string) $_POST['types']) : '';
         $types = is_string($raw) ? json_decode($raw, true) : null;
         if (!is_array($types)) {
             wp_send_json_error(array('message' => __('Invalid types payload.', 'zen-cortext')));
         }
+        // json_decode() does not sanitize. Zen_Cortext_KB_Types::save() is the
+        // sanitization + validation layer: it runs sanitize_key() on slugs,
+        // sanitize_text_field()/sanitize_textarea_field() on label/description,
+        // and rejects malformed rows — so every decoded field is cleaned there.
         $result = Zen_Cortext_KB_Types::save($types);
         if (is_wp_error($result)) {
             wp_send_json_error(array('message' => $result->get_error_message()));
@@ -1384,7 +1468,11 @@ class Zen_Cortext_Admin {
         $id        = isset($_POST['id']) ? (int) $_POST['id'] : 0;
         $title     = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
         $type      = isset($_POST['type']) ? sanitize_key(wp_unslash($_POST['type'])) : '';
-        $raw       = isset($_POST['raw_content']) ? wp_unslash((string) $_POST['raw_content']) : '';
+        // Artifact source is admin-authored long-form text (often technical,
+        // may contain literal <> in code/config snippets) that is fed to the
+        // AI restructurer and re-escaped on output. sanitize_textarea()
+        // validates UTF-8 + strips control chars without lossy tag-stripping.
+        $raw       = isset($_POST['raw_content']) ? $this->sanitize_textarea($_POST['raw_content']) : '';
         $source    = isset($_POST['source']) ? sanitize_key(wp_unslash($_POST['source'])) : 'manual';
         $author_id = isset($_POST['author_id']) && $_POST['author_id'] !== '' ? absint($_POST['author_id']) : null;
         // Defaults to TRUE for back-compat with anything still hitting the
@@ -1498,6 +1586,19 @@ class Zen_Cortext_Admin {
         if (!is_array($messages) || empty($messages)) {
             wp_send_json_error(array('message' => 'No conversation to synthesize. Have a chat first.'));
         }
+        // json_decode does not sanitize — clean each decoded message before
+        // it's used (role → enum-ish key, content → UTF-8/control-stripped).
+        $messages = array_values(array_filter(array_map(function ($m) {
+            if (!is_array($m)) return null;
+            return array(
+                'role'    => isset($m['role'])    ? sanitize_key((string) $m['role'])              : '',
+                // Already unslashed before json_decode, so don't unslash again.
+                'content' => isset($m['content']) ? sanitize_textarea_field((string) $m['content']) : '',
+            );
+        }, $messages)));
+        if (empty($messages)) {
+            wp_send_json_error(array('message' => 'No conversation to synthesize. Have a chat first.'));
+        }
 
         $draft = Zen_Cortext_API::synthesize_artifact_from_chat($messages, $type, $title, $reference_ids, $exclude_id);
         if (is_wp_error($draft)) {
@@ -1544,8 +1645,8 @@ class Zen_Cortext_Admin {
             'match_gclid_present' => !empty($_POST['match_gclid_present']) ? 1 : 0,
             'priority'            => isset($_POST['priority']) ? (int) $_POST['priority'] : 0,
             'enabled'             => !empty($_POST['enabled']) ? 1 : 0,
-            'context_text'        => isset($_POST['context_text'])   ? wp_unslash((string) $_POST['context_text'])   : '',
-            'invite_message'      => isset($_POST['invite_message']) ? wp_unslash((string) $_POST['invite_message']) : '',
+            'context_text'        => isset($_POST['context_text'])   ? sanitize_textarea_field(wp_unslash((string) $_POST['context_text']))   : '',
+            'invite_message'      => isset($_POST['invite_message']) ? sanitize_textarea_field(wp_unslash((string) $_POST['invite_message'])) : '',
             // Chips arrive as a JSON string from the editor.
             'chips_json'          => isset($_POST['chips_json'])     ? wp_unslash((string) $_POST['chips_json'])     : '',
             // Intro-card override: JSON string with the 5 fields, or '' when
@@ -1685,9 +1786,12 @@ class Zen_Cortext_Admin {
         $id   = isset($_POST['id']) ? (int) $_POST['id'] : 0;
         $data = array(
             'label'                => isset($_POST['label'])                ? sanitize_text_field(wp_unslash($_POST['label']))      : '',
-            'description'          => isset($_POST['description'])          ? wp_unslash((string) $_POST['description'])             : '',
-            'script'               => isset($_POST['script'])               ? wp_unslash((string) $_POST['script'])                  : '',
-            'outcome_instructions' => isset($_POST['outcome_instructions']) ? wp_unslash((string) $_POST['outcome_instructions'])    : '',
+            'description'          => isset($_POST['description'])          ? sanitize_textarea_field(wp_unslash((string) $_POST['description']))          : '',
+            // The interview script is parsed by Zen_Cortext_Survey_Parser and
+            // fed to the AI; sanitize_textarea() validates UTF-8 + strips
+            // control chars while preserving the script's structure markers.
+            'script'               => isset($_POST['script'])               ? $this->sanitize_textarea($_POST['script'])                                  : '',
+            'outcome_instructions' => isset($_POST['outcome_instructions']) ? sanitize_textarea_field(wp_unslash((string) $_POST['outcome_instructions'])) : '',
             'enabled'              => !empty($_POST['enabled']) ? 1 : 0,
         );
 

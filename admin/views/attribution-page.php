@@ -95,16 +95,25 @@ if (!defined('ABSPATH')) exit;
                     <input type="text" id="zat-utm-campaign" class="regular-text" />
                     <span class="zat-synced-picker-wrap" style="margin-left:8px;">
                         <select id="zat-synced-picker" style="max-width:340px;">
-                            <option value=""><?php esc_html_e('— Or pick from Google Ads sync —', 'zen-cortext'); ?></option>
+                            <option value=""><?php esc_html_e('— Or pick a campaign / ad group from Google Ads sync —', 'zen-cortext'); ?></option>
                         </select>
                     </span>
                     <p class="description">
-                        <?php esc_html_e('Comma-separated. Each entry can be a campaign name OR the numeric campaign ID. If any entry matches a synced row (by either field), live Google Ads metadata is appended to the AI prompt.', 'zen-cortext'); ?>
+                        <?php esc_html_e('Comma-separated. Each entry can be a campaign or ad-group name, OR its numeric ID. If any entry matches a synced Google Ads row (campaign or ad group, by name or ID), that row\'s live headlines & keywords are appended to the AI prompt.', 'zen-cortext'); ?>
                         <?php
                         printf(
                             /* translators: %s is a <code>-wrapped example value(s) the admin can paste into the field. */
                             ' ' . wp_kses(__('Example: %s.', 'zen-cortext'), array('code' => array())),
                             '<code>foreman-pro-q2, foreman-pro-q3</code>'
+                        );
+                        ?>
+                    </p>
+                    <p class="description zat-utm-template-help">
+                        <strong><?php esc_html_e('UTM tracking template:', 'zen-cortext'); ?></strong>
+                        <?php
+                        echo wp_kses(
+                            __('To match at <strong>campaign</strong> level, set your Google Ads final-URL suffix / tracking template to <code>utm_campaign={campaignid}</code>; to match at <strong>ad-group</strong> level use <code>utm_campaign={adgroupid}</code>. Google fills those ValueTrack IDs in automatically, so pick the matching entry below <em>by ID</em>. Matching by name only works if you tag <code>utm_campaign</code> with the exact campaign or ad-group name yourself.', 'zen-cortext'),
+                            array('strong' => array(), 'code' => array(), 'em' => array())
                         );
                         ?>
                     </p>
@@ -300,38 +309,4 @@ if (!defined('ABSPATH')) exit;
     </div>
 </div>
 
-<style>
-.zen-cortext-attribution .zat-synced-preview {
-    background: #f6f7f7;
-    border-left: 4px solid #2271b1;
-    padding: 14px 18px;
-    margin: 16px 0 24px 0;
-}
-.zen-cortext-attribution .zat-synced-preview h4 { margin: 0 0 4px 0; }
-.zen-cortext-attribution .zat-synced-preview-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-top: 12px;
-}
-.zen-cortext-attribution .zat-synced-preview-grid h5 {
-    margin: 0 0 6px 0;
-    font-size: 13px;
-}
-.zen-cortext-attribution .zat-synced-preview-grid h5 .count {
-    color: #757575;
-    font-weight: normal;
-}
-.zen-cortext-attribution .zat-synced-preview ul {
-    margin: 0;
-    padding-left: 18px;
-    max-height: 220px;
-    overflow-y: auto;
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 3px;
-    padding: 8px 8px 8px 26px;
-}
-.zen-cortext-attribution .zat-synced-preview li { margin-bottom: 2px; }
-</style>
 </div>

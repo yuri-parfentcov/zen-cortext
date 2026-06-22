@@ -257,7 +257,7 @@ class Zen_Cortext_Api_Keys {
         $id  = (int) $row['id'];
 
         $check = function ($window_sec, $max) use ($id, $now) {
-            $key = 'zc_apirl_' . $id . '_' . $window_sec;
+            $key = 'zen_cortext_apirl_' . $id . '_' . $window_sec;
             $cutoff = $now - $window_sec;
             $timestamps = get_transient($key);
             if (!is_array($timestamps)) $timestamps = array();
@@ -290,7 +290,7 @@ class Zen_Cortext_Api_Keys {
     private static function touch_last_used($id) {
         $id = (int) $id;
         if ($id <= 0) return;
-        $tk = 'zc_apitouch_' . $id;
+        $tk = 'zen_cortext_apitouch_' . $id;
         if (get_transient($tk)) return;
         set_transient($tk, 1, self::TOUCH_THROTTLE_SEC);
         global $wpdb;
