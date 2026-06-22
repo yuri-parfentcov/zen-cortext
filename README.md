@@ -10,7 +10,7 @@ Zen Cortext turns your published pages, posts, FAQs, and case studies into a kno
 - **Bring your own Anthropic API key** — no markup, no proxy server, no third-party data sharing. The chat talks to Anthropic directly from your WordPress host.
 - **Lives entirely in your WordPress install** — every conversation, lead, and analytic event is stored in your own database. Uninstall the plugin and it all goes with it.
 
-> **Current version:** 2.35.0 · **License:** GPL v2 or later · **WordPress:** 5.9+ · **PHP:** 7.4+
+> **Current version:** 2.39.13 · **License:** GPL v2 or later · **WordPress:** 5.9+ · **PHP:** 7.4+
 
 ---
 
@@ -153,6 +153,8 @@ Drop `[zen_cortext]` into any page or post. Works with Gutenberg, the Classic ed
 
 When editing a page, set **Page Attributes → Template → "Zen Cortext — Full-page client chat"**. This bypasses your theme's header / footer and lets the chat own the whole viewport. Best for a dedicated `/talk/` or `/consultant/` URL.
 
+Because this template skips your theme (and therefore any header/footer code plugin), the **Settings → Tracking** tab provides **Header / Body / Footer custom-code fields** — paste your Google Tag Manager, GA4, Meta Pixel, or site-verification tags there and they'll be injected into the full-page chat.
+
 ### Float button
 
 Enable on the **Design** tab. A small floating chat icon appears on every public page (except the chat page itself) and links to your chat page. Configure the position, color, icon, and hover text.
@@ -194,7 +196,7 @@ When you delete the plugin from the WordPress admin (Plugins → Delete), `unins
 
 - **Conversations live in your WordPress database.** They are never sent to Zen Republic Agency or any third party we control.
 - **Outbound calls** the plugin makes are limited to: Anthropic (for the AI), Groq or OpenAI (only if you enable voice transcription), and any webhook endpoints you yourself configure.
-- **GDPR mode** in the User Sessions settings gates session tracking on Google Consent Mode v2 — the beacon only fires after the visitor grants `analytics_storage`.
+- **GDPR mode** in the Tracking settings gates session tracking on Google Consent Mode v2 — the beacon only fires after the visitor grants `analytics_storage`.
 
 ---
 
