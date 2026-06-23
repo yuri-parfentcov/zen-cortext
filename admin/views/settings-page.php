@@ -335,6 +335,78 @@ $tabs = array(
                 </tr>
             </table>
 
+            <?php
+            // Reference manual for the frontend chat's analytics data layer.
+            // Purely informational (no inputs) — safe inside the settings
+            // form. Collapsed by default so it doesn't crowd the settings.
+            // Mirrors docs/data-layer-events.md; keep the two in sync.
+            $zc_dl_events = array(
+                array('zc_chat_started',       __('the visitor sends their first message of the session', 'zen-cortext'),       'zc_attributed'),
+                array('zc_message_sent',       __('the visitor sends any message', 'zen-cortext'),                              'zc_message_index, zc_char_count'),
+                array('zc_message_received',   __('an AI reply finishes streaming', 'zen-cortext'),                             'zc_message_index, zc_char_count'),
+                array('zc_admin_requested',    __('a human is requested (handoff / "talk to a person")', 'zen-cortext'),        'zc_source (auto | lead_form | manual_bar), zc_target_user'),
+                array('zc_admin_joined',       __('a human actually takes over the chat', 'zen-cortext'),                       'zc_message_index'),
+                array('zc_lead_submitted',     __('the contact form is saved — conversion', 'zen-cortext'),                     'zc_has_whatsapp'),
+                array('zc_chat_shared',        __('the visitor copies the share link', 'zen-cortext'),                         'zc_message_index'),
+                array('zc_transcript_emailed', __('the "email me a copy" form succeeds', 'zen-cortext'),                        'zc_message_index'),
+                array('zc_service_unavailable',__('the AI backend errors and the fallback form is shown', 'zen-cortext'),       'zc_reason'),
+            );
+            ?>
+            <details class="zc-datalayer-doc" style="max-width:920px;margin:24px 0 8px;border:1px solid #c3c4c7;border-radius:6px;background:#fff;">
+                <summary style="cursor:pointer;padding:12px 16px;font-size:14px;font-weight:600;">
+                    <?php esc_html_e('Data layer events reference (GTM / GA4)', 'zen-cortext'); ?>
+                </summary>
+                <div style="padding:4px 16px 16px;">
+                    <p class="description" style="max-width:880px;">
+                        <?php esc_html_e('The frontend chat pushes semantic events to window.dataLayer (Google Tag Manager / GA4) and mirrors each one as a DOM CustomEvent named zc:<name> so analytics that don\'t use a tag manager (Plausible, Matomo, custom listeners) can subscribe too.', 'zen-cortext'); ?>
+                        <br>
+                        <strong><?php esc_html_e('Privacy:', 'zen-cortext'); ?></strong>
+                        <?php esc_html_e('no PII is ever emitted — no name, email, phone, or message text. Only the chat uid, page path, counts, and boolean flags.', 'zen-cortext'); ?>
+                    </p>
+
+                    <p style="margin:14px 0 4px;font-weight:600;"><?php esc_html_e('Common fields on every event', 'zen-cortext'); ?></p>
+                    <p class="description">
+                        <code>event</code> (the <code>zc_*</code> GTM trigger key) ·
+                        <code>zc_chat_uid</code> ·
+                        <code>zc_page_path</code>
+                    </p>
+
+                    <table class="widefat striped" style="margin-top:12px;">
+                        <thead>
+                            <tr>
+                                <th style="width:200px;"><?php esc_html_e('event', 'zen-cortext'); ?></th>
+                                <th><?php esc_html_e('Fires when…', 'zen-cortext'); ?></th>
+                                <th style="width:300px;"><?php esc_html_e('Extra fields', 'zen-cortext'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($zc_dl_events as $zc_ev): ?>
+                            <tr>
+                                <td><code><?php echo esc_html($zc_ev[0]); ?></code></td>
+                                <td><?php echo esc_html($zc_ev[1]); ?></td>
+                                <td><?php echo esc_html($zc_ev[2]); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+
+                    <p style="margin:16px 0 4px;font-weight:600;"><?php esc_html_e('GA4 mapping suggestions', 'zen-cortext'); ?></p>
+                    <ul style="list-style:disc;margin-left:20px;max-width:880px;">
+                        <li><code>zc_lead_submitted</code> — <?php esc_html_e('mark as a GA4 Conversion (this is the lead).', 'zen-cortext'); ?></li>
+                        <li><code>zc_admin_requested</code>, <code>zc_admin_joined</code> — <?php esc_html_e('high-intent custom conversions.', 'zen-cortext'); ?></li>
+                        <li><code>zc_chat_started</code> — <?php esc_html_e('funnel-entry / engagement event.', 'zen-cortext'); ?></li>
+                    </ul>
+
+                    <p style="margin:16px 0 4px;font-weight:600;"><?php esc_html_e('Disable site-wide', 'zen-cortext'); ?></p>
+                    <pre class="code" style="background:#f6f7f7;border:1px solid #dcdcde;padding:10px 12px;border-radius:4px;overflow:auto;">add_filter('zen_cortext_data_layer_enabled', '__return_false');</pre>
+
+                    <p style="margin:16px 0 4px;font-weight:600;"><?php esc_html_e('Listening without a tag manager', 'zen-cortext'); ?></p>
+                    <pre class="code" style="background:#f6f7f7;border:1px solid #dcdcde;padding:10px 12px;border-radius:4px;overflow:auto;">document.addEventListener('zc:lead_submitted', function (e) {
+    console.log('lead', e.detail.zc_chat_uid, e.detail.zc_has_whatsapp);
+});</pre>
+                </div>
+            </details>
+
         <?php endif; ?>
 
         <?php submit_button(); ?>

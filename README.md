@@ -10,7 +10,7 @@ Zen Cortext turns your published pages, posts, FAQs, and case studies into a kno
 - **Bring your own Anthropic API key** — no markup, no proxy server, no third-party data sharing. The chat talks to Anthropic directly from your WordPress host.
 - **Lives entirely in your WordPress install** — every conversation, lead, and analytic event is stored in your own database. Uninstall the plugin and it all goes with it.
 
-> **Current version:** 2.39.13 · **License:** GPL v2 or later · **WordPress:** 5.9+ · **PHP:** 7.4+
+> **Current version:** 2.39.18 · **License:** GPL v2 or later · **WordPress:** 5.9+ · **PHP:** 7.4+
 
 ---
 
@@ -230,6 +230,30 @@ The plugin exposes a scoped read-only REST API under `/wp-json/zc/v1/` for pulli
 On the outbound side, a **webhooks** layer pushes events as they happen — `lead.captured`, `chat.started`, `admin.joined`, and more — to a URL you provide (Slack, Zapier, your CRM's inbound webhook).
 
 A detailed API reference is on the roadmap (`docs/api.md`).
+
+---
+
+## Analytics & data layer
+
+The frontend chat pushes semantic events to `window.dataLayer` (Google Tag Manager / GA4) and mirrors each one as a DOM `CustomEvent` named `zc:<name>`, so analytics that don't use a tag manager (Plausible, Matomo, custom listeners) can subscribe too. Events are **on by default**; disable them site-wide with `add_filter('zen_cortext_data_layer_enabled', '__return_false')`.
+
+**No PII is ever emitted** — no name, email, phone, or message text. Each event carries only the chat uid, page path, counts, and boolean flags (e.g. `zc_has_whatsapp`).
+
+| Event | Fires when… |
+|-------|-------------|
+| `zc_chat_started` | the visitor sends their first message of the session |
+| `zc_message_sent` | the visitor sends any message |
+| `zc_message_received` | an AI reply finishes streaming |
+| `zc_admin_requested` | a human is requested (handoff / "talk to a person") |
+| `zc_admin_joined` | a human actually takes over the chat |
+| `zc_lead_submitted` | the contact form is saved — **conversion** |
+| `zc_chat_shared` | the visitor copies the share link |
+| `zc_transcript_emailed` | the "email me a copy" form succeeds |
+| `zc_service_unavailable` | the AI backend errors and the fallback form is shown |
+
+In GA4, mark `zc_lead_submitted` as a Conversion (it's the lead); `zc_admin_requested` / `zc_admin_joined` make good high-intent custom conversions. A copy of this reference also lives in the admin under **Settings → Tracking**. Full field-level docs: [`docs/data-layer-events.md`](docs/data-layer-events.md).
+
+This is the client-side counterpart to the server-side **webhooks** above: the data layer feeds your marketing/analytics stack in the browser, while webhooks push the same kinds of events server-to-server.
 
 ---
 

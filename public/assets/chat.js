@@ -46,6 +46,7 @@
         let userScrolledAway = false;
         let leadFormRendered = false; // one inline form per chat session
         let leadSubmitted    = false; // becomes true after the lead endpoint confirms
+        let userMessageCount = 0;     // visitor messages this session (drives chat_started / message_sent analytics)
 
         /* ---------- sound notification ---------- */
         var audioCtx = null;
@@ -226,6 +227,35 @@
         let viewOnlyMode = false;
         let currentSlotKey = '';
 
+        /* ---------- analytics data layer ----------
+           Push semantic chat events to window.dataLayer (GTM/GA4) and
+           mirror each as a DOM CustomEvent (zc:<name>) so non-GTM
+           analytics (Plausible, Matomo, custom listeners) can subscribe
+           without a tag manager. Privacy: we NEVER emit PII — no name,
+           email, phone, or message text. Only the chat uid, page path,
+           counts, and boolean flags. Disabled when the site owner sets
+           the `zen_cortext_data_layer_enabled` filter to false. */
+        // wp_localize_script casts booleans to strings ("1" for true, ""
+        // for false), so a raw `!== false` check would never see the
+        // disabled state. Treat the empty string / "0" / 0 / false as off;
+        // anything else (including an absent key) defaults to on.
+        const dataLayerEnabled = !(cfg.dataLayer === false || cfg.dataLayer === '' || cfg.dataLayer === '0' || cfg.dataLayer === 0);
+        function emitEvent(name, params) {
+            if (!dataLayerEnabled) return;
+            const detail = Object.assign({
+                event:        'zc_' + name,
+                zc_chat_uid:  chatUid || null,
+                zc_page_path: (window.location && window.location.pathname) || ''
+            }, params || {});
+            try {
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push(detail);
+            } catch (e) {}
+            try {
+                document.dispatchEvent(new CustomEvent('zc:' + name, { detail: detail }));
+            } catch (e) {}
+        }
+
         // chatReady resolves once chatUid + ownerToken are bound. send()
         // awaits this so a visitor who types and hits Enter within the
         // 400ms attribution-lookup window doesn't fire a request with an
@@ -261,6 +291,10 @@
             msclkid:      readQueryParam('msclkid'),
             fbc:          readCookie('_fbc'),
             fbp:          readCookie('_fbp'),
+            // a-metrics first-party visitor id. `_amv` is HttpOnly (unreadable here);
+            // `_amv_js` is its JS-readable mirror, used to stitch this chat to the
+            // visitor's a-metrics journey on ingest.
+            amv:          readCookie('_amv_js'),
         };
 
         /* ---------- visitor session uid ----------
@@ -433,12 +467,19 @@
             renderLeadForm(target);
         }
 
-        function triggerAutoInvite(user) {
+        function triggerAutoInvite(user, source) {
             if (!restRoot || !chatUid) return;
             if (viewOnlyMode) return;
             if (inviteSent) return;
             inviteSent = true;
             inviteTarget = user;
+            // "Admin request" — the visitor asked for (or the AI offered and
+            // the visitor accepted) a human. High-intent signal.
+            emitEvent('admin_requested', {
+                zc_source:       source || 'auto',
+                zc_target_user:  user && user.id ? parseInt(user.id, 10) : null,
+                zc_message_index: userMessageCount
+            });
             showInvitePendingBanner(user.display_name || 'a consultant');
             startPolling();
             scheduleInviteFallback();
@@ -546,7 +587,7 @@
             if (inviteBtn) {
                 inviteBtn.addEventListener('click', function () {
                     if (!target) return;
-                    triggerAutoInvite(target);
+                    triggerAutoInvite(target, 'lead_form');
                     inviteBtn.disabled = true;
                     inviteBtn.textContent = 'Inviting ' + (target.display_name || 'them') + '…';
                 });
@@ -580,6 +621,12 @@
             .then(function (resp) {
                 if (resp && resp.saved) {
                     leadSubmitted = true;
+                    // Conversion event. PII stays out of the data layer —
+                    // only a flag for whether a WhatsApp number was given.
+                    emitEvent('lead_submitted', {
+                        zc_has_whatsapp: !!data.whatsapp,
+                        zc_message_index: userMessageCount
+                    });
                     // Mirror the just-submitted email into the prefill cache so
                     // an immediate "Email me a copy" click in the same session
                     // populates the form without waiting for a page reload to
@@ -735,9 +782,12 @@
                     // Fallback: prompt the user with the link.
                     try { window.prompt('Copy this link to come back to your conversation:', url); copied = true; } catch (e) {}
                 }
-                if (copied && shareStatus) {
-                    shareStatus.textContent = '✓ Link copied';
-                    setTimeout(function () { shareStatus.textContent = ''; }, 2400);
+                if (copied) {
+                    emitEvent('chat_shared', { zc_message_index: userMessageCount });
+                    if (shareStatus) {
+                        shareStatus.textContent = '✓ Link copied';
+                        setTimeout(function () { shareStatus.textContent = ''; }, 2400);
+                    }
                 }
             });
         }
@@ -853,6 +903,7 @@
                 }
 
                 cachedLeadEmail = email;
+                emitEvent('transcript_emailed', { zc_message_index: userMessageCount });
                 if (emailStatus) emailStatus.textContent = '✓ Sent';
                 setTimeout(function () {
                     hideEmailForm();
@@ -952,6 +1003,11 @@
                             btn.textContent = 'Invited ✓';
                             inviteSent = true;
                             inviteTarget = { id: userId, display_name: userName };
+                            emitEvent('admin_requested', {
+                                zc_source:        'manual_bar',
+                                zc_target_user:   userId,
+                                zc_message_index: userMessageCount
+                            });
                             showInvitePendingBanner(userName);
                             startPolling();
                             scheduleInviteFallback();
@@ -986,8 +1042,14 @@
         }
 
         function enterAdminMode(name) {
+            var wasAdminMode = adminMode;
             adminMode = true;
             adminName = name || 'A consultant';
+            // Human took over the chat. Emit once on the transition only —
+            // enterAdminMode is re-entrant (poll + stream can both call it).
+            if (!wasAdminMode) {
+                emitEvent('admin_joined', { zc_message_index: userMessageCount });
+            }
             startPolling();
 
             // Admin made it in time — cancel the lead-fallback timer.
@@ -2002,6 +2064,20 @@
             // message — they have a conversation worth saving from this point.
             showShareButton();
 
+            // Analytics: the first visitor message starts the chat; every
+            // message (including the first) is a message_sent. Fired here —
+            // after chatReady — so chat_uid is bound on the payload.
+            userMessageCount += 1;
+            if (userMessageCount === 1) {
+                emitEvent('chat_started', {
+                    zc_attributed: !!(attribution && Object.keys(attribution).length)
+                });
+            }
+            emitEvent('message_sent', {
+                zc_message_index: userMessageCount,
+                zc_char_count:    text.length
+            });
+
             // Fetch invitable users if not already fetched.
             if (invitableUsers === null) {
                 fetchInvitableUsers();
@@ -2120,6 +2196,7 @@
                                 const fallback = event.message ||
                                     'The AI consultant is currently unavailable. Leave your contact below and our team will follow up shortly.';
                                 addMessage('assistant', fallback);
+                                emitEvent('service_unavailable', { zc_reason: event.type });
                                 if (typeof renderLeadForm === 'function') renderLeadForm(null);
                                 streaming = false;
                                 sendBtn.disabled = false;
@@ -2149,6 +2226,10 @@
 
                 if (assistantText) {
                     messages.push({ role: 'assistant', content: assistantText });
+                    emitEvent('message_received', {
+                        zc_message_index: userMessageCount,
+                        zc_char_count:    assistantText.length
+                    });
                     if (bubble) {
                         const msgDiv = bubble.closest('.zc-message');
                         const parts = extractChips(assistantText);

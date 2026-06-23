@@ -175,6 +175,12 @@ class Zen_Cortext_Shortcode {
             'introCard'             => get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card()),
             'welcomeMessage'        => get_option('zen_cortext_welcome_message', Zen_Cortext_Defaults::welcome_message()),
             'defaultChips'          => array_values((array) get_option('zen_cortext_default_chips', array())),
+            // Analytics data layer: when true, the chat pushes semantic
+            // events (chat_started, message_sent, lead_submitted, …) to
+            // window.dataLayer (GTM/GA4) and mirrors them as DOM
+            // CustomEvents. No PII is ever emitted — only ids, counts and
+            // flags. Site owners can disable via the filter below.
+            'dataLayer'             => (bool) apply_filters('zen_cortext_data_layer_enabled', true),
         );
     }
 
@@ -399,7 +405,8 @@ class Zen_Cortext_Shortcode {
           gclid:        qp('gclid'),
           msclkid:      qp('msclkid'),
           fbc:          ck('_fbc'),
-          fbp:          ck('_fbp')
+          fbp:          ck('_fbp'),
+          amv:          ck('_amv_js')
         }
       });
 
