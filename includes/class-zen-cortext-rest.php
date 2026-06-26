@@ -10,20 +10,21 @@
  * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
  * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
  * phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
- * phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
  *
  * Justification:
  * - SQL: plugin-owned tables interpolated as identifiers; user values go
  *   through $wpdb->prepare(). Same rationale as the data-layer classes.
- * - Nonce + Sanitize: these are REST endpoints registered via
- *   register_rest_route() with an explicit permission_callback that gates
- *   on capability + own apikey/livechat auth before the handler runs.
- *   REST routes use WP REST nonces (X-WP-Nonce header) handled by core,
- *   not check_ajax_referer; the linter does not recognise that path.
- *   Request params come through $request->get_param() which is already
- *   the WP-recommended boundary — direct $_GET/$_POST reads inside
- *   handlers are limited to streaming setup (SSE preamble) where the
- *   request body has already been validated by the route schema.
+ * - Nonce: these are REST endpoints registered via register_rest_route()
+ *   with an explicit permission_callback that gates on capability + own
+ *   apikey/livechat auth (or a verified WP REST nonce on public routes)
+ *   before the handler runs; the linter does not recognise that path.
+ * - Sanitize: NOT blanket-disabled. Request params come through
+ *   $request->get_param(), the WP-recommended boundary. The one direct
+ *   superglobal read ($_FILES['audio'] in handle_transcribe) validates and
+ *   sanitizes each field individually at the boundary (is_uploaded_file on
+ *   the temp path, (int) on size, sanitize_mime_type on the MIME,
+ *   sanitize_file_name on the name); only the PHP-generated temp path itself
+ *   carries a targeted phpcs:ignore since it is validated, not sanitizable.
  */
 
 if (!defined('ABSPATH')) {
@@ -282,7 +283,10 @@ class Zen_Cortext_Rest {
         register_rest_route('zen-cortext/v1', '/transcribe', array(
             'methods'             => 'POST',
             'callback'            => array($this, 'handle_transcribe'),
-            'permission_callback' => '__return_true',
+            // Public (logged-out visitors use voice input), but the request
+            // must carry a valid WP REST nonce minted into the chat config on
+            // page render, proving it originated from a page this site served.
+            'permission_callback' => array($this, 'verify_rest_nonce'),
         ));
 
         /* ---- Apps Script ingestion (Bearer API key, separate from livechat) ---- */
@@ -418,6 +422,33 @@ class Zen_Cortext_Rest {
      * client gates the mic button on the same flag so a non-toggled
      * site never even exposes the button.
      */
+    /**
+     * Permission callback for public visitor-facing endpoints that read
+     * request input directly (e.g. the multipart audio upload). These are
+     * intentionally reachable by logged-out visitors, so we cannot gate on a
+     * capability; instead we require a valid WP REST nonce (`wp_rest`),
+     * supplied via the X-WP-Nonce header or a _wpnonce param. The nonce is
+     * minted into the chat config (Zen_Cortext_Shortcode::chat_config_payload)
+     * when the page is rendered. For logged-out visitors the `wp_rest` nonce
+     * is stable within its lifetime window, so it still validates on
+     * full-page-cached (e.g. Varnish) sites. This proves the request came
+     * from a page this site served rather than a blind cross-origin POST.
+     */
+    public function verify_rest_nonce($request) {
+        $nonce = $request->get_header('X-WP-Nonce');
+        if (empty($nonce)) {
+            $nonce = $request->get_param('_wpnonce');
+        }
+        if (empty($nonce) || !wp_verify_nonce((string) $nonce, 'wp_rest')) {
+            return new WP_Error(
+                'zc_bad_nonce',
+                'Invalid or expired security token. Reload the page and try again.',
+                array('status' => 403)
+            );
+        }
+        return true;
+    }
+
     public function handle_transcribe($request) {
         if (!get_option('zen_cortext_voice_enabled', false)) {
             return new WP_Error('zc_voice_disabled', 'Voice transcription is not enabled.', array('status' => 503));
@@ -435,35 +466,43 @@ class Zen_Cortext_Rest {
             return $resp;
         }
 
-        // Expect $_FILES['audio'] from FormData. We bypass WP's
-        // sanitize_file_name() because the browser-generated blob name
-        // is arbitrary (typically "blob") and the transcribe class
-        // sanitises it again before forwarding.
+        // Expect $_FILES['audio'] from FormData. Each field is validated and
+        // sanitized at this boundary before use: the upload is confirmed to be
+        // a genuine PHP upload (is_uploaded_file), size is range-checked, the
+        // MIME type goes through sanitize_mime_type() + an audio/* allow-check,
+        // and the filename through sanitize_file_name(). The transcribe class
+        // sanitizes the name/mime again before forwarding (defense in depth).
         if (empty($_FILES['audio']) || !is_array($_FILES['audio'])) {
             return new WP_Error('zc_no_audio', 'Missing audio upload field.', array('status' => 400));
         }
-        $file = $_FILES['audio'];
-        if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
-            return new WP_Error('zc_upload_error', 'Audio upload failed.', array('status' => 400, 'detail' => (int) ($file['error'] ?? -1)));
+        // Pull only the specific fields we use, each individually sanitized;
+        // we never consume the raw $_FILES array wholesale.
+        $error    = isset($_FILES['audio']['error'])    ? (int) $_FILES['audio']['error'] : -1;
+        $tmp_name = isset($_FILES['audio']['tmp_name']) ? (string) $_FILES['audio']['tmp_name'] : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PHP-generated upload temp path, validated via is_uploaded_file() below; not user-controlled text to sanitize.
+        $size     = isset($_FILES['audio']['size'])     ? (int) $_FILES['audio']['size'] : 0;
+        $mime     = isset($_FILES['audio']['type'])     ? sanitize_mime_type(wp_unslash((string) $_FILES['audio']['type'])) : 'audio/webm';
+        $name     = isset($_FILES['audio']['name'])     ? sanitize_file_name(wp_unslash((string) $_FILES['audio']['name'])) : 'audio.webm';
+
+        if ($error !== UPLOAD_ERR_OK) {
+            return new WP_Error('zc_upload_error', 'Audio upload failed.', array('status' => 400, 'detail' => $error));
         }
-        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+        if ($tmp_name === '' || !is_uploaded_file($tmp_name)) {
             return new WP_Error('zc_upload_invalid', 'Audio upload is not a valid uploaded file.', array('status' => 400));
         }
-        $size = (int) ($file['size'] ?? 0);
         if ($size <= 0) {
             return new WP_Error('zc_upload_empty', 'Audio upload is empty.', array('status' => 400));
         }
         if ($size > 10 * 1024 * 1024) {
             return new WP_Error('zc_upload_too_large', 'Audio upload exceeds the 10 MB limit.', array('status' => 413));
         }
-
-        $mime = isset($file['type']) ? (string) $file['type'] : 'audio/webm';
-        if (stripos($mime, 'audio/') !== 0) {
+        if ($mime === '' || stripos($mime, 'audio/') !== 0) {
             return new WP_Error('zc_bad_mime', 'Upload is not an audio file.', array('status' => 400));
         }
-        $name = isset($file['name']) ? (string) $file['name'] : 'audio.webm';
+        if ($name === '') {
+            $name = 'audio.webm';
+        }
 
-        $result = Zen_Cortext_Transcribe::transcribe($file['tmp_name'], $mime, $name);
+        $result = Zen_Cortext_Transcribe::transcribe($tmp_name, $mime, $name);
         if (is_wp_error($result)) {
             $status = 502; // upstream provider error
             $code   = $result->get_error_code();
@@ -1306,6 +1345,10 @@ class Zen_Cortext_Rest {
             'referrer', 'landing_page',
             'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
             'gclid', 'msclkid', 'fbc', 'fbp',
+            // a-metrics first-party visitor id (from the `_amv_js` mirror cookie),
+            // carried on the /send attribution payload to stitch the chat to the
+            // visitor's a-metrics journey on ingest.
+            'amv',
         );
         $clean = array();
         foreach ($allowed as $k) {

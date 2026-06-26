@@ -68,6 +68,10 @@ class Zen_Cortext_Sessions {
             'referrer', 'landing_page',
             'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
             'gclid', 'msclkid', 'fbc', 'fbp',
+            // a-metrics first-party visitor id (from the `_amv_js` mirror cookie).
+            // An identity key, not a marketing signal — deliberately excluded from
+            // is_enriched()/attribution_compatible() so it never starts a new session.
+            'amv',
         );
         $clean = array();
         foreach ($allowed as $k) {
@@ -177,6 +181,7 @@ class Zen_Cortext_Sessions {
             'msclkid'        => self::truncate($attribution['msclkid']      ?? '', 255),
             'fbc'            => self::truncate($attribution['fbc']          ?? '', 255),
             'fbp'            => self::truncate($attribution['fbp']          ?? '', 255),
+            'amv'            => self::truncate($attribution['amv']          ?? '', 128),
             'referrer'       => self::truncate($attribution['referrer']     ?? '', 2048),
             'landing_page'   => self::truncate($landing, 2048),
             'user_agent'     => self::truncate((string) $user_agent, 1024),

@@ -7,7 +7,7 @@ if (!defined("ABSPATH")) { exit; }
  */
 if (!defined('ABSPATH')) exit;
 
-function zcs_truncate($s, $n = 60) {
+function zen_cortext_sessions_truncate($s, $n = 60) {
     $s = trim((string) $s);
     if (function_exists('mb_substr')) {
         return mb_strlen($s) > $n ? mb_substr($s, 0, $n) . '…' : $s;
@@ -15,13 +15,13 @@ function zcs_truncate($s, $n = 60) {
     return strlen($s) > $n ? substr($s, 0, $n) . '…' : $s;
 }
 
-function zcs_pill($value) {
+function zen_cortext_sessions_pill($value) {
     $value = trim((string) $value);
     if ($value === '') return '<span class="zcs-pill-empty">—</span>';
-    return '<span class="zcs-pill" title="' . esc_attr($value) . '">' . esc_html(zcs_truncate($value, 28)) . '</span>';
+    return '<span class="zcs-pill" title="' . esc_attr($value) . '">' . esc_html(zen_cortext_sessions_truncate($value, 28)) . '</span>';
 }
 
-function zcs_host_only($url) {
+function zen_cortext_sessions_host_only($url) {
     $url = trim((string) $url);
     if ($url === '') return '';
     $host = wp_parse_url($url, PHP_URL_HOST);
@@ -120,20 +120,20 @@ if (is_array($rules)) {
                     </td>
                     <td><?php echo esc_html(substr($r['last_seen_at'], 0, 16)); ?></td>
                     <td><?php echo esc_html(substr($r['first_seen_at'], 0, 16)); ?></td>
-                    <td><?php echo wp_kses_post(zcs_pill($src_med)); ?></td>
-                    <td><?php echo wp_kses_post(zcs_pill($r['utm_campaign'])); ?></td>
-                    <td><?php echo wp_kses_post($click_id !== '' ? zcs_pill($click_id) : '<span class="zcs-pill-empty">—</span>'); ?></td>
+                    <td><?php echo wp_kses_post(zen_cortext_sessions_pill($src_med)); ?></td>
+                    <td><?php echo wp_kses_post(zen_cortext_sessions_pill($r['utm_campaign'])); ?></td>
+                    <td><?php echo wp_kses_post($click_id !== '' ? zen_cortext_sessions_pill($click_id) : '<span class="zcs-pill-empty">—</span>'); ?></td>
                     <td>
                         <?php if ($r['landing_page'] !== ''): ?>
                             <span class="zcs-pill" title="<?php echo esc_attr($r['landing_page']); ?>">
-                                <?php echo esc_html(zcs_truncate(zcs_host_only($r['landing_page']) . (wp_parse_url($r['landing_page'], PHP_URL_PATH) ?: ''), 36)); ?>
+                                <?php echo esc_html(zen_cortext_sessions_truncate(zen_cortext_sessions_host_only($r['landing_page']) . (wp_parse_url($r['landing_page'], PHP_URL_PATH) ?: ''), 36)); ?>
                             </span>
                         <?php else: ?><span class="zcs-pill-empty">—</span><?php endif; ?>
                     </td>
                     <td>
                         <?php if ($rule_label !== ''): ?>
                             <span class="zcs-pill zcs-pill-rule" title="<?php echo esc_attr($rule_label); ?>">
-                                <?php echo esc_html(zcs_truncate($rule_label, 24)); ?>
+                                <?php echo esc_html(zen_cortext_sessions_truncate($rule_label, 24)); ?>
                             </span>
                         <?php else: ?><span class="zcs-pill-empty">—</span><?php endif; ?>
                     </td>

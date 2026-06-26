@@ -24,7 +24,7 @@ $zc_shortcode = Zen_Cortext_Shortcode::get_instance();
 $zc_shortcode->register_assets();
 wp_enqueue_style('zen-cortext-livechat');
 wp_enqueue_script('zen-cortext-livechat');
-wp_localize_script('zen-cortext-livechat', 'zlcConfig', array(
+wp_localize_script('zen-cortext-livechat', 'zenCortextLivechat', array(
     'restRoot' => esc_url_raw(rest_url('zen-cortext/v1')),
     'homeUrl'  => home_url('/'),
     'version'  => ZEN_CORTEXT_VERSION,

@@ -6,7 +6,7 @@ if (!defined("ABSPATH")) { exit; }
  */
 if (!defined('ABSPATH')) exit;
 
-function zcc_first_user_msg($messages_json) {
+function zen_cortext_chats_first_user_msg($messages_json) {
     $msgs = json_decode($messages_json, true);
     if (!is_array($msgs)) return '';
     foreach ($msgs as $m) {
@@ -17,7 +17,7 @@ function zcc_first_user_msg($messages_json) {
     return '';
 }
 
-function zcc_truncate($s, $n = 100) {
+function zen_cortext_chats_truncate($s, $n = 100) {
     $s = trim((string) $s);
     if (function_exists('mb_substr')) {
         return mb_strlen($s) > $n ? mb_substr($s, 0, $n) . '…' : $s;
@@ -25,13 +25,13 @@ function zcc_truncate($s, $n = 100) {
     return strlen($s) > $n ? substr($s, 0, $n) . '…' : $s;
 }
 
-function zcc_pill($value, $label = '') {
+function zen_cortext_chats_pill($value, $label = '') {
     $value = trim((string) $value);
     if ($value === '') return '<span class="zcc-pill-empty">—</span>';
     if ($label !== '') {
-        return '<span class="zcc-pill" title="' . esc_attr($label . ': ' . $value) . '">' . esc_html(zcc_truncate($value, 28)) . '</span>';
+        return '<span class="zcc-pill" title="' . esc_attr($label . ': ' . $value) . '">' . esc_html(zen_cortext_chats_truncate($value, 28)) . '</span>';
     }
-    return '<span class="zcc-pill">' . esc_html(zcc_truncate($value, 28)) . '</span>';
+    return '<span class="zcc-pill">' . esc_html(zen_cortext_chats_truncate($value, 28)) . '</span>';
 }
 
 $base_url = admin_url('admin.php?page=zen-cortext-chats');
@@ -93,13 +93,13 @@ $base_url = admin_url('admin.php?page=zen-cortext-chats');
             <?php else: foreach ($result['rows'] as $r):
                 $view_url = add_query_arg(array('action' => 'view', 'id' => (int) $r['id']), $base_url);
                 $click_id = $r['gclid'] !== '' ? ('gclid: ' . $r['gclid']) : ($r['msclkid'] !== '' ? ('msclkid: ' . $r['msclkid']) : '');
-                $first = zcc_first_user_msg($r['messages']);
+                $first = zen_cortext_chats_first_user_msg($r['messages']);
                 $is_deleted = !empty($r['deleted_at']);
                 $row_class = $is_deleted ? 'zcc-deleted' : '';
             ?>
                 <tr data-id="<?php echo (int) $r['id']; ?>" class="<?php echo esc_attr($row_class); ?>">
                     <td>
-                        <a href="<?php echo esc_url($view_url); ?>"><strong><?php echo esc_html(zcc_truncate($first, 90)); ?></strong></a>
+                        <a href="<?php echo esc_url($view_url); ?>"><strong><?php echo esc_html(zen_cortext_chats_truncate($first, 90)); ?></strong></a>
                         <?php if ($is_deleted): ?>
                             <span class="zcc-badge-deleted" title="<?php echo esc_attr('Deleted by visitor on ' . $r['deleted_at']); ?>"><?php esc_html_e('DELETED', 'zen-cortext'); ?></span>
                         <?php endif; ?>
@@ -122,10 +122,10 @@ $base_url = admin_url('admin.php?page=zen-cortext-chats');
                         <?php endif; ?>
                     </td>
                     <td><?php echo (int) $r['message_count']; ?></td>
-                    <td><?php echo wp_kses_post(zcc_pill($r['utm_source'])); ?></td>
-                    <td><?php echo wp_kses_post(zcc_pill($r['utm_medium'])); ?></td>
-                    <td><?php echo wp_kses_post(zcc_pill($r['utm_campaign'])); ?></td>
-                    <td><?php echo wp_kses_post($click_id !== '' ? zcc_pill($click_id, 'Click ID') : '<span class="zcc-pill-empty">—</span>'); ?></td>
+                    <td><?php echo wp_kses_post(zen_cortext_chats_pill($r['utm_source'])); ?></td>
+                    <td><?php echo wp_kses_post(zen_cortext_chats_pill($r['utm_medium'])); ?></td>
+                    <td><?php echo wp_kses_post(zen_cortext_chats_pill($r['utm_campaign'])); ?></td>
+                    <td><?php echo wp_kses_post($click_id !== '' ? zen_cortext_chats_pill($click_id, 'Click ID') : '<span class="zcc-pill-empty">—</span>'); ?></td>
                     <td><?php echo esc_html(substr($r['updated_at'], 0, 16)); ?></td>
                     <td class="zcc-row-actions">
                         <a href="<?php echo esc_url($view_url); ?>" class="button button-small"><?php esc_html_e('View', 'zen-cortext'); ?></a>

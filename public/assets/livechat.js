@@ -1,11 +1,11 @@
 /* Zen Cortext — Live Chat Admin (PWA)
- * Reads window.zlcConfig = { restRoot, homeUrl, version }
+ * Reads window.zenCortextLivechat = { restRoot, homeUrl, version }
  * Auth via Bearer session tokens stored in localStorage.
  */
 (function () {
     'use strict';
 
-    var cfg = window.zlcConfig || {};
+    var cfg = window.zenCortextLivechat || {};
     var rest = (cfg.restRoot || '').replace(/\/$/, '');
     var app = document.getElementById('zlc-app');
     if (!app || !rest) return;
@@ -817,7 +817,7 @@
             try {
                 new Notification('New visitor message', {
                     body: 'A visitor sent a message in the live chat.',
-                    icon: (window.zlcConfig && zlcConfig.icon) || undefined,
+                    icon: (window.zenCortextLivechat && zenCortextLivechat.icon) || undefined,
                     tag: 'zlc-msg-' + activeChatUid
                 });
             } catch (e) {}

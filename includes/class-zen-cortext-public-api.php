@@ -668,7 +668,7 @@ class Zen_Cortext_Public_API {
         $cols = 'id, chat_uid, session_uid, message_count, created_at, updated_at, deleted_at,
                  referrer, landing_page,
                  utm_source, utm_medium, utm_campaign, utm_term, utm_content,
-                 gclid, msclkid, fbc, fbp,
+                 gclid, msclkid, fbc, fbp, amv,
                  lead_name, lead_email, lead_whatsapp, lead_submitted_at,
                  admin_user_id, admin_attached_at, admin_detached_at';
         if ($include_messages) $cols .= ', messages';
@@ -731,6 +731,10 @@ class Zen_Cortext_Public_API {
             'message_count' => (int) ($r['message_count'] ?? 0),
             'created_at'    => $this->to_iso8601($r['created_at']),
             'updated_at'    => $this->to_iso8601($r['updated_at']),
+            // a-metrics first-party visitor id (from the `_amv_js` cookie). A
+            // top-level identity key, not marketing attribution — kept out of the
+            // `attribution` object. Empty when the visitor had no a-metrics cookie.
+            'amv'           => (string) ($r['amv'] ?? ''),
             'attribution'   => (object) $attribution, // empty -> {} in JSON, not []
             'lead'          => $lead,
             'handoff'       => $handoff,

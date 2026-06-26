@@ -603,12 +603,15 @@ class Zen_Cortext_API {
         // only the user turn, no assistant answer, and no logged error.
         // ignore_user_abort keeps PHP alive past the disconnect so the answer
         // still streams to completion and lands in the DB (the visitor can
-        // resume/replay it). set_time_limit(0) prevents a max_execution_time
-        // kill on long generations (curl itself caps at 120s below).
+        // resume/replay it). We also raise max_execution_time so a long
+        // generation isn't killed mid-stream — but only to a BOUNDED value
+        // (not 0/unlimited) and only here, scoped to this one streaming
+        // request, never as a global default. 180s comfortably covers the
+        // upstream HTTP timeout (120s) plus the post-stream DB persist.
         ignore_user_abort(true);
         if (function_exists('set_time_limit')) {
-            // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- the visitor chat is a long-lived Server-Sent Events stream; without lifting max_execution_time PHP kills the request mid-generation. Guarded by function_exists() and the request is already a dedicated streaming endpoint.
-            @set_time_limit(0);
+            // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- bounded (180s) lift of max_execution_time, scoped to this single Server-Sent Events streaming request only (not global/init/__construct); without it PHP kills the request mid-generation. Guarded by function_exists().
+            @set_time_limit(180);
         }
 
         // Persist what we have so far (before streaming) so we capture even

@@ -9,7 +9,6 @@
  * phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
  * phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
  * phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
- * phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
  *
  * Justification:
  * - SQL: this file is a data-access surface for plugin-owned tables
@@ -24,12 +23,17 @@
  *   followed by check_ajax_referer('zen_cortext_admin', 'nonce') before
  *   reading any superglobal. The linter cannot trace nonce checks across
  *   helper methods.
- * - Sanitize/Unslash: $_GET reads on render_*_page() methods sanitize via
- *   sanitize_key()/(int) before use; $_POST reads inside ajax_* handlers
- *   wrap values in sanitize_text_field(wp_unslash(...)) at the point of
- *   use. A handful of fields (API keys, system prompts) are wrapped in
- *   wp_unslash() only because sanitize_text_field would strip legitimate
- *   characters the field is allowed to contain.
+ * - Sanitize/Unslash: NOT blanket-disabled. Every $_GET/$_POST read is
+ *   unslashed + sanitized at its point of use with a context-appropriate
+ *   function (sanitize_key/(int)/sanitize_text_field/esc_url_raw/array_map).
+ *   The few exceptions carry a TARGETED, justified phpcs:ignore on their own
+ *   line: JSON payloads (types/messages/chips_json/intro_card_json) are
+ *   json_decoded and then sanitized field-by-field in their save() layer with
+ *   the right function per field (sanitize_text_field, sanitize_textarea_field,
+ *   wp_kses_post for HTML bodies, esc_url_raw for URLs); AI-prompt/script
+ *   textareas go through sanitize_textarea() which unslashes + validates UTF-8
+ *   + strips control chars while preserving the angle-bracket tokens those
+ *   prompts require.
  */
 
 if (!defined('ABSPATH')) {
@@ -1115,7 +1119,8 @@ class Zen_Cortext_Admin {
         // values fall back to basic so a bookmarked legacy URL lands
         // on a sensible default instead of an empty page.
         $allowed = array('basic', 'rail', 'prompts');
-        $tab = (isset($_GET['tab']) && in_array($_GET['tab'], $allowed, true)) ? $_GET['tab'] : 'basic';
+        $req_tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : '';
+        $tab = in_array($req_tab, $allowed, true) ? $req_tab : 'basic';
         include ZEN_CORTEXT_PLUGIN_DIR . 'admin/views/chat-page.php';
     }
 
@@ -1291,7 +1296,7 @@ class Zen_Cortext_Admin {
         // own backend test via the zen_cortext_test_connection filter, and
         // may read additional $_POST overrides it forwards itself.)
         $overrides = array();
-        if (isset($_POST['api_key'])) $overrides['api_key'] = wp_unslash((string) $_POST['api_key']);
+        if (isset($_POST['api_key'])) $overrides['api_key'] = sanitize_text_field(wp_unslash((string) $_POST['api_key']));
         $result = Zen_Cortext_API::test_connection($overrides);
         wp_send_json($result);
     }
@@ -1388,7 +1393,11 @@ class Zen_Cortext_Admin {
      */
     public function ajax_types_save() {
         $this->check_request();
-        $raw = isset($_POST['types']) ? wp_unslash((string) $_POST['types']) : '';
+        // $_POST['types'] is a JSON string: json_decoded just below and every
+        // field validated + sanitized in Zen_Cortext_KB_Types::save()
+        // (sanitize_key on slugs, sanitize_text_field on labels,
+        // sanitize_textarea_field on descriptions). Never echoed raw.
+        $raw = isset($_POST['types']) ? wp_unslash((string) $_POST['types']) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON payload, decoded + per-field sanitized in KB_Types::save() (see note above).
         $types = is_string($raw) ? json_decode($raw, true) : null;
         if (!is_array($types)) {
             wp_send_json_error(array('message' => __('Invalid types payload.', 'zen-cortext')));
@@ -1472,7 +1481,7 @@ class Zen_Cortext_Admin {
         // may contain literal <> in code/config snippets) that is fed to the
         // AI restructurer and re-escaped on output. sanitize_textarea()
         // validates UTF-8 + strips control chars without lossy tag-stripping.
-        $raw       = isset($_POST['raw_content']) ? $this->sanitize_textarea($_POST['raw_content']) : '';
+        $raw       = isset($_POST['raw_content']) ? $this->sanitize_textarea($_POST['raw_content']) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- sanitize_textarea() unslashes + validates UTF-8 + strips control chars while preserving angle-bracket prompt tokens the AI restructurer needs.
         $source    = isset($_POST['source']) ? sanitize_key(wp_unslash($_POST['source'])) : 'manual';
         $author_id = isset($_POST['author_id']) && $_POST['author_id'] !== '' ? absint($_POST['author_id']) : null;
         // Defaults to TRUE for back-compat with anything still hitting the
@@ -1571,7 +1580,7 @@ class Zen_Cortext_Admin {
     public function ajax_artifact_synthesize_from_chat() {
         $this->check_request();
 
-        $messages_raw  = isset($_POST['messages']) ? wp_unslash((string) $_POST['messages']) : '';
+        $messages_raw  = isset($_POST['messages']) ? wp_unslash((string) $_POST['messages']) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON; decoded below and each message sanitized (sanitize_key role, sanitize_textarea_field content) before use.
         $type          = isset($_POST['type']) ? sanitize_key(wp_unslash($_POST['type'])) : '';
         $title         = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
         $exclude_id    = isset($_POST['exclude_id']) ? (int) $_POST['exclude_id'] : 0;
@@ -1648,12 +1657,12 @@ class Zen_Cortext_Admin {
             'context_text'        => isset($_POST['context_text'])   ? sanitize_textarea_field(wp_unslash((string) $_POST['context_text']))   : '',
             'invite_message'      => isset($_POST['invite_message']) ? sanitize_textarea_field(wp_unslash((string) $_POST['invite_message'])) : '',
             // Chips arrive as a JSON string from the editor.
-            'chips_json'          => isset($_POST['chips_json'])     ? wp_unslash((string) $_POST['chips_json'])     : '',
+            'chips_json'          => isset($_POST['chips_json'])     ? wp_unslash((string) $_POST['chips_json'])     : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON; decoded + every field sanitize_text_field'd in Zen_Cortext_Attribution::normalize_chips_json().
             // Intro-card override: JSON string with the 5 fields, or '' when
             // the override checkbox in the editor is off. normalize_intro_card_json
             // collapses an all-blank-fields object back to '' so the rule
             // falls back to the global intro card payload.
-            'intro_card_json'     => isset($_POST['intro_card_json']) ? wp_unslash((string) $_POST['intro_card_json']) : '',
+            'intro_card_json'     => isset($_POST['intro_card_json']) ? wp_unslash((string) $_POST['intro_card_json']) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON; decoded + field-by-field sanitized (sanitize_text_field name/role, wp_kses_post body, esc_url_raw urls) in Zen_Cortext_Attribution::normalize_intro_card_json().
             'survey_id'           => isset($_POST['survey_id']) ? (int) $_POST['survey_id'] : 0,
         );
 
@@ -1790,7 +1799,7 @@ class Zen_Cortext_Admin {
             // The interview script is parsed by Zen_Cortext_Survey_Parser and
             // fed to the AI; sanitize_textarea() validates UTF-8 + strips
             // control chars while preserving the script's structure markers.
-            'script'               => isset($_POST['script'])               ? $this->sanitize_textarea($_POST['script'])                                  : '',
+            'script'               => isset($_POST['script'])               ? $this->sanitize_textarea($_POST['script'])                                  : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- sanitize_textarea() unslashes + validates UTF-8 + strips control chars while preserving angle-bracket prompt tokens.
             'outcome_instructions' => isset($_POST['outcome_instructions']) ? sanitize_textarea_field(wp_unslash((string) $_POST['outcome_instructions'])) : '',
             'enabled'              => !empty($_POST['enabled']) ? 1 : 0,
         );
@@ -1861,8 +1870,7 @@ class Zen_Cortext_Admin {
     public function ajax_webhooks_save() {
         $this->check_request();
         $id     = isset($_POST['id']) ? sanitize_text_field(wp_unslash((string) $_POST['id'])) : '';
-        $events = isset($_POST['events']) ? (array) $_POST['events'] : array();
-        $events = array_map('sanitize_text_field', array_map('wp_unslash', $events));
+        $events = isset($_POST['events']) ? array_map('sanitize_text_field', (array) wp_unslash($_POST['events'])) : array();
         $data = array(
             'label'   => isset($_POST['label'])   ? sanitize_text_field(wp_unslash((string) $_POST['label']))   : '',
             'url'     => isset($_POST['url'])     ? esc_url_raw(wp_unslash((string) $_POST['url']))             : '',
@@ -1907,8 +1915,7 @@ class Zen_Cortext_Admin {
 
     public function ajax_api_keys_create() {
         $this->check_request();
-        $scopes = isset($_POST['scopes']) ? (array) $_POST['scopes'] : array();
-        $scopes = array_map('sanitize_text_field', array_map('wp_unslash', $scopes));
+        $scopes = isset($_POST['scopes']) ? array_map('sanitize_text_field', (array) wp_unslash($_POST['scopes'])) : array();
         $label  = isset($_POST['label']) ? sanitize_text_field(wp_unslash((string) $_POST['label'])) : '';
         $rpm    = isset($_POST['rate_per_min'])  ? (int) $_POST['rate_per_min']  : 60;
         $rph    = isset($_POST['rate_per_hour']) ? (int) $_POST['rate_per_hour'] : 3000;

@@ -171,6 +171,7 @@ class Zen_Cortext_Chats {
             'msclkid'       => self::truncate(self::pick($data, 'msclkid'), 255),
             'fbc'           => self::truncate(self::pick($data, 'fbc'), 255),
             'fbp'           => self::truncate(self::pick($data, 'fbp'), 255),
+            'amv'           => self::truncate(self::pick($data, 'amv'), 128),
             'created_at'    => $now,
             'updated_at'    => $now,
         );
@@ -513,6 +514,7 @@ class Zen_Cortext_Chats {
             'msclkid'      => 255,
             'fbc'          => 255,
             'fbp'          => 255,
+            'amv'          => 128,
         );
         foreach ($fields as $field => $max) {
             if (empty($existing[$field])) {

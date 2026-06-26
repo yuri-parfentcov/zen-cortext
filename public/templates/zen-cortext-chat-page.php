@@ -196,6 +196,10 @@ wp_enqueue_style('zen-cortext-chat-page');
 $zc_body_css     = 'body.zcp-body{font-family:' . Zen_Cortext_Shortcode::sanitize_font_family($chat_font_family)
                  . ';font-size:' . (int) $chat_font_size_px . 'px;}';
 $zc_override_css = Zen_Cortext_Shortcode::build_color_override_css();
+// CSS string: font-family is run through sanitize_font_family() (strips
+// ;{}<>\ and newlines), size is (int)-cast, and build_color_override_css()
+// hex-regex-validates colors + token names. wp_add_inline_style has no
+// esc_* equivalent; safety here is per-value CSS-context sanitization.
 wp_add_inline_style('zen-cortext-chat-page', $zc_body_css . $zc_override_css);
 
 wp_print_styles(array('zen-cortext-public', 'zen-cortext-chat-page'));

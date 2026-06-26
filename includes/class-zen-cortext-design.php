@@ -584,6 +584,10 @@ class Zen_Cortext_Design {
         if (!$settings) return;
         wp_register_style('zen-cortext-float-button', false, array(), ZEN_CORTEXT_VERSION);
         wp_enqueue_style('zen-cortext-float-button');
+        // CSS string: every interpolated value is sanitized for CSS context in
+        // build_float_button_css()/resolve_float_button() (hex-regex color,
+        // integer-clamped padding, enum-checked positions) — none reach an
+        // attribute/HTML context. wp_add_inline_style has no esc_* equivalent.
         wp_add_inline_style('zen-cortext-float-button', self::build_float_button_css($settings));
     }
 
@@ -591,8 +595,19 @@ class Zen_Cortext_Design {
         $settings = self::float_button_render_settings();
         if (!$settings) return;
 
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- build_float_button_markup() escapes every dynamic value (esc_url on URLs, esc_attr/esc_html on text); wp_kses_post would strip the <img> alt and aria attrs.
-        echo self::build_float_button_markup($settings);
+        // Escaped at output via wp_kses() with an explicit allow-list. The
+        // builder already escapes every dynamic value (esc_url/esc_attr/
+        // esc_html); wp_kses here is the belt-and-suspenders output gate and
+        // keeps the aria-label/role/alt attrs that wp_kses_post would drop.
+        echo wp_kses(
+            self::build_float_button_markup($settings),
+            array(
+                'div'  => array('class' => true, 'id' => true),
+                'a'    => array('href' => true, 'class' => true, 'aria-label' => true, 'title' => true),
+                'img'  => array('src' => true, 'alt' => true),
+                'span' => array('class' => true, 'role' => true),
+            )
+        );
     }
 
     /**

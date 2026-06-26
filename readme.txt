@@ -4,7 +4,7 @@ Tags: chatbot, ai chat, lead generation, knowledge base, customer support
 Requires at least: 5.9
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.39.13
+Stable tag: 2.39.19
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -173,6 +173,14 @@ The Settings → Tracking tab provides Header / Body / Footer code fields that a
 5. The Getting Started admin page — twelve setup steps with completion tracking.
 
 == Changelog ==
+
+= 2.39.19 =
+* WordPress.org review compliance: removed a one-time migration that authored a Google Tag Manager script snippet directly in the plugin's PHP source. Tracking/analytics code is now strictly admin-pasted via the Settings → Tracking Header/Body/Footer custom-code fields; the plugin no longer generates any script markup of its own. Existing installs keep whatever code they previously saved in those fields.
+* WordPress.org review compliance: the long-running visitor-chat stream now raises the PHP time limit to a bounded value (180s) scoped to that single streaming request, instead of removing it entirely; it is never set globally.
+* WordPress.org review compliance: the public voice-transcription endpoint (/transcribe) now requires a valid WordPress REST nonce (X-WP-Nonce) before reading the uploaded audio, validating that the request originated from a page this site served.
+* WordPress.org review compliance: removed the blanket file-level suppression of the input-sanitization checks in the admin and REST classes. Every request input is now unslashed and sanitized at its point of use with a context-appropriate function (including per-field sanitization of JSON payloads and individual validation of the audio upload's fields), and Plugin Check passes with the sanitization sniffs enabled.
+* WordPress.org review compliance: prefix audit. Removed the short-prefixed [zen_author_bio]/[zen_author_posts_heading] shortcode aliases (the canonical [zen_cortext_author_*] tags remain), renamed the livechat JS config global from zlcConfig to zenCortextLivechat, and renamed six global admin-view helper functions from the zcc_/zcs_ prefixes to the full zen_cortext_ prefix. Every public function, class, shortcode, option, hook, and JS global the plugin defines now carries the full zen_cortext prefix.
+* WordPress.org review compliance: output-escaping audit. The float-button markup is now escaped at output through wp_kses() with an explicit allow-list. Remaining raw outputs are documented at the point of output: inline CSS (every value sanitized for CSS context; wp_add_inline_style has no escaping function), Server-Sent-Events stream chunks (JSON-encoded), the chat template renderer (escapes every placeholder; the custom Header/Body/Footer code fields follow WordPress core's Custom HTML widget model, stored verbatim only for users with the unfiltered_html capability and run through wp_kses_post() for everyone else).
 
 = 2.39.13 =
 * Custom code for the chat pages: the full-page chat (/talk/) renders its own document and bypasses the theme, so analytics/scripts added via your theme or a header-footer plugin did not load there. Settings → Tracking now has Header, Body, and Footer code fields that inject your own code (Google Tag Manager, GA4, Meta Pixel, site-verification meta tags, etc.) directly into the chat page. This replaces an earlier theme-specific Google Tag Manager hook; existing tag-manager setups are migrated into the Header/Body fields automatically. The fields are stored raw only for users with the unfiltered_html capability (administrators); other roles' input is filtered through wp_kses_post().

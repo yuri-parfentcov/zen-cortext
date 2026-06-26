@@ -39,7 +39,7 @@ class Zen_Cortext_Shortcode {
         $code = (string) get_option('zen_cortext_header_code', '');
         if (trim($code) === '') return;
         echo "\n";
-        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-authored custom code, capability-gated by unfiltered_html on save; escaping would defeat the feature.
+        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Raw by design (same model as WP core's Custom HTML widget). The value is stored verbatim by Zen_Cortext_Admin::sanitize_custom_code() ONLY when the saving user holds `unfiltered_html` (admins single-site / super admins multisite); every other role's input is run through wp_kses_post() at save. This field exists to inject analytics/tracking <script> (GTM/GA4/Pixel) onto the standalone chat page, which bypasses wp_head(); escaping at output would strip exactly that and defeat the feature.
         echo "\n";
     }
 
@@ -48,7 +48,7 @@ class Zen_Cortext_Shortcode {
         $code = (string) get_option('zen_cortext_body_code', '');
         if (trim($code) === '') return;
         echo "\n";
-        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-authored custom code, capability-gated by unfiltered_html on save; escaping would defeat the feature.
+        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Raw by design (same model as WP core's Custom HTML widget). The value is stored verbatim by Zen_Cortext_Admin::sanitize_custom_code() ONLY when the saving user holds `unfiltered_html` (admins single-site / super admins multisite); every other role's input is run through wp_kses_post() at save. This field exists to inject analytics/tracking <script> (GTM/GA4/Pixel) onto the standalone chat page, which bypasses wp_head(); escaping at output would strip exactly that and defeat the feature.
         echo "\n";
     }
 
@@ -57,7 +57,7 @@ class Zen_Cortext_Shortcode {
         $code = (string) get_option('zen_cortext_footer_code', '');
         if (trim($code) === '') return;
         echo "\n";
-        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-authored custom code, capability-gated by unfiltered_html on save; escaping would defeat the feature.
+        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Raw by design (same model as WP core's Custom HTML widget). The value is stored verbatim by Zen_Cortext_Admin::sanitize_custom_code() ONLY when the saving user holds `unfiltered_html` (admins single-site / super admins multisite); every other role's input is run through wp_kses_post() at save. This field exists to inject analytics/tracking <script> (GTM/GA4/Pixel) onto the standalone chat page, which bypasses wp_head(); escaping at output would strip exactly that and defeat the feature.
         echo "\n";
     }
 
@@ -168,6 +168,10 @@ class Zen_Cortext_Shortcode {
         return array(
             'restUrl'               => esc_url_raw(rest_url('zen-cortext/v1/send')),
             'restRoot'              => esc_url_raw(rest_url('zen-cortext/v1')),
+            // WP REST nonce for public endpoints that require origin proof
+            // (e.g. /transcribe). Stable per tick for logged-out visitors so
+            // it survives full-page caching; sent as X-WP-Nonce on those calls.
+            'restNonce'             => wp_create_nonce('wp_rest'),
             'attributionContextUrl' => esc_url_raw(rest_url('zen-cortext/v1/attribution-context')),
             'transcribeUrl'         => esc_url_raw(rest_url('zen-cortext/v1/transcribe')),
             'voiceEnabled'          => (bool) get_option('zen_cortext_voice_enabled', false),
@@ -196,6 +200,10 @@ class Zen_Cortext_Shortcode {
             // font-family / font-size) attached AFTER chat.css so the
             // cascade beats the published defaults. Empty when nothing is
             // configured, so this is a no-op on default sites.
+            // CSS string: build_color_override_css() emits only values it has
+            // sanitized for CSS context (hex-regex colors, --zc- token-name
+            // regex, sanitize_font_family(), (int) size). wp_add_inline_style
+            // has no esc_* equivalent; safety is per-value CSS sanitization.
             $override_css = self::build_color_override_css();
             if ($override_css !== '') {
                 wp_add_inline_style('zen-cortext-public', $override_css);

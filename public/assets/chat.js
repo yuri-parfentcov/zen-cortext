@@ -1846,9 +1846,11 @@
                           : 'webm';
                 const fd = new FormData();
                 fd.append('audio', blob, 'voice.' + ext);
+                const headers = {};
+                if (cfg.restNonce) headers['X-WP-Nonce'] = cfg.restNonce;
                 let res;
                 try {
-                    res = await fetch(transcribeUrl, { method: 'POST', body: fd });
+                    res = await fetch(transcribeUrl, { method: 'POST', body: fd, headers: headers });
                 } catch (e) {
                     throw new Error('Network error.');
                 }

@@ -2,7 +2,7 @@
 /**
  * Zen Cortext — Author Bio (absorbed from the zen-author-bio mu-plugin).
  *
- * Provides the [zen_author_bio] + [zen_author_posts_heading] shortcodes
+ * Provides the [zen_cortext_author_bio] + [zen_cortext_author_posts_heading] shortcodes
  * and the `the_content` filter that auto-styles inline "Author: Name"
  * lines in single posts. Pulls per-user data from the same custom user
  * meta keys (zen_user_avatar, author_email, author_whatsapp,
@@ -30,15 +30,12 @@ class Zen_Cortext_Author_Bio {
     }
 
     private function __construct() {
-        // Canonical, fully-prefixed shortcode tags.
+        // Canonical, fully-prefixed shortcode tags. (The short-prefixed
+        // [zen_author_*] aliases were removed in 2.39.19 for WordPress.org
+        // prefix compliance — every public shortcode now carries the full
+        // zen_cortext_ prefix.)
         add_shortcode('zen_cortext_author_bio',           array(__CLASS__, 'shortcode_bio'));
         add_shortcode('zen_cortext_author_posts_heading', array(__CLASS__, 'shortcode_heading'));
-        // Deprecated back-compat aliases (these slugs were inherited from the
-        // standalone zen-author-bio mu-plugin this feature absorbed). Kept so
-        // existing author templates/content using [zen_author_bio] keep
-        // working; new installs should use the zen_cortext_* tags above.
-        add_shortcode('zen_author_bio',           array(__CLASS__, 'shortcode_bio'));
-        add_shortcode('zen_author_posts_heading', array(__CLASS__, 'shortcode_heading'));
         add_filter('the_content',                  array(__CLASS__, 'filter_content'), 20);
         // Author-bio + inline post-author card styles/JS go through the
         // enqueue pipeline (author-bio.css / author-bio.js) instead of
@@ -49,7 +46,7 @@ class Zen_Cortext_Author_Bio {
     /**
      * Register and (where relevant) enqueue the author-bio assets. The
      * inline post-author card can appear on any single post, and the
-     * [zen_author_bio] card appears on author archives — enqueue on both.
+     * [zen_cortext_author_bio] card appears on author archives — enqueue on both.
      */
     public static function register_assets() {
         wp_register_style(
@@ -72,7 +69,7 @@ class Zen_Cortext_Author_Bio {
     }
 
     /**
-     * [zen_author_bio] — 2-column layout: left (photo, name, contacts), right (bio).
+     * [zen_cortext_author_bio] — 2-column layout: left (photo, name, contacts), right (bio).
      * Only renders on author archive pages so it's safe to drop into a
      * shared author template without leaking onto unrelated pages.
      */
@@ -188,7 +185,7 @@ class Zen_Cortext_Author_Bio {
     }
 
     /**
-     * [zen_author_posts_heading] — "Articles by Author Name".
+     * [zen_cortext_author_posts_heading] — "Articles by Author Name".
      */
     public static function shortcode_heading() {
         if (!is_author()) {
