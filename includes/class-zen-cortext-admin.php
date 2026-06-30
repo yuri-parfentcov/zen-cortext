@@ -1395,16 +1395,19 @@ class Zen_Cortext_Admin {
         $this->check_request();
         // $_POST['types'] is a JSON string: json_decoded just below and every
         // field validated + sanitized in Zen_Cortext_KB_Types::save()
-        // (sanitize_key on slugs, sanitize_text_field on labels,
-        // sanitize_textarea_field on descriptions). Never echoed raw.
+        // (strict regex whitelist on slugs via validate_slug, sanitize_text_field
+        // on labels, sanitize_textarea_field on descriptions, and a UTF-8 /
+        // control-char clean on the free-form restructure_prompt). Never
+        // echoed raw.
         $raw = isset($_POST['types']) ? wp_unslash((string) $_POST['types']) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON payload, decoded + per-field sanitized in KB_Types::save() (see note above).
         $types = is_string($raw) ? json_decode($raw, true) : null;
         if (!is_array($types)) {
             wp_send_json_error(array('message' => __('Invalid types payload.', 'zen-cortext')));
         }
         // json_decode() does not sanitize. Zen_Cortext_KB_Types::save() is the
-        // sanitization + validation layer: it runs sanitize_key() on slugs,
-        // sanitize_text_field()/sanitize_textarea_field() on label/description,
+        // sanitization + validation layer: it runs a strict regex whitelist on
+        // slugs (validate_slug), sanitize_text_field()/sanitize_textarea_field()
+        // on label/description, a UTF-8 + control-char clean on restructure_prompt,
         // and rejects malformed rows — so every decoded field is cleaned there.
         $result = Zen_Cortext_KB_Types::save($types);
         if (is_wp_error($result)) {

@@ -308,7 +308,7 @@ $tabs = array(
             ?>
             <h2><?php esc_html_e('Custom code (chat pages)', 'zen-cortext'); ?></h2>
             <p class="description" style="max-width:880px;">
-                <?php esc_html_e('The full-page chat (the /talk/ page) renders its own document and intentionally bypasses your theme — so analytics or scripts you add via your theme or a header/footer plugin do NOT load there. Paste that code below and it will be injected into the standalone chat page. Use it for Google Tag Manager, Google Analytics, the Meta Pixel, site-verification meta tags, or any custom script.', 'zen-cortext'); ?>
+                <?php esc_html_e('The full-page chat (the /talk/ page) renders its own document and intentionally bypasses your theme — so analytics or scripts you add via your theme or a header/footer plugin do NOT load there. Paste your tracking snippet below (Google Tag Manager, Google Analytics, the Meta Pixel, etc.) and its JavaScript will run on the chat page. Note: only the JavaScript in the snippet is emitted — non-script parts such as a Tag Manager <noscript> fallback or <meta> verification tags are skipped here (the chat needs JavaScript, and the page is not indexed).', 'zen-cortext'); ?>
             </p>
 
             <table class="form-table" role="presentation">
@@ -316,21 +316,21 @@ $tabs = array(
                     <th><label for="zen_cortext_header_code"><?php esc_html_e('Header code', 'zen-cortext'); ?></label></th>
                     <td>
                         <textarea id="zen_cortext_header_code" name="zen_cortext_header_code" rows="6" class="large-text code" spellcheck="false" placeholder="&lt;!-- e.g. Google Tag Manager / GA4 / verification meta --&gt;"><?php echo esc_textarea($header_code); ?></textarea>
-                        <p class="description"><?php esc_html_e('Printed inside <head>, as high as possible. Best for tag managers, analytics loaders, and <meta> verification tags.', 'zen-cortext'); ?></p>
+                        <p class="description"><?php esc_html_e('Emitted in <head>. Best for tag managers and analytics loaders (paste the full snippet — its JavaScript runs; <meta> tags are skipped).', 'zen-cortext'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th><label for="zen_cortext_body_code"><?php esc_html_e('Body code', 'zen-cortext'); ?></label></th>
                     <td>
                         <textarea id="zen_cortext_body_code" name="zen_cortext_body_code" rows="6" class="large-text code" spellcheck="false" placeholder="&lt;!-- e.g. GTM &lt;noscript&gt; fallback --&gt;"><?php echo esc_textarea($body_code); ?></textarea>
-                        <p class="description"><?php esc_html_e('Printed immediately after the opening <body> tag. Best for the GTM <noscript> fallback.', 'zen-cortext'); ?></p>
+                        <p class="description"><?php esc_html_e('Emitted just after the opening <body> tag. For scripts that need to run early. (A Tag Manager <noscript> fallback is not needed — the chat requires JavaScript.)', 'zen-cortext'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th><label for="zen_cortext_footer_code"><?php esc_html_e('Footer code', 'zen-cortext'); ?></label></th>
                     <td>
                         <textarea id="zen_cortext_footer_code" name="zen_cortext_footer_code" rows="6" class="large-text code" spellcheck="false" placeholder="&lt;!-- e.g. deferred trackers / chat widgets --&gt;"><?php echo esc_textarea($footer_code); ?></textarea>
-                        <p class="description"><?php esc_html_e('Printed just before the closing </body> tag. Best for deferred scripts and third-party widgets.', 'zen-cortext'); ?></p>
+                        <p class="description"><?php esc_html_e('Emitted just before the closing </body> tag. Best for deferred tracking scripts.', 'zen-cortext'); ?></p>
                     </td>
                 </tr>
             </table>

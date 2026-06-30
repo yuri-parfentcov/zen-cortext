@@ -4,7 +4,7 @@ Tags: chatbot, ai chat, lead generation, knowledge base, customer support
 Requires at least: 5.9
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.39.19
+Stable tag: 2.39.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -162,7 +162,7 @@ When admin push notifications are enabled, web-push messages are sent through th
 
 = Custom code fields (optional — your own tracking) =
 
-The Settings → Tracking tab provides Header / Body / Footer code fields that are output verbatim on the standalone chat pages. The plugin itself makes no call to any third party here — it only prints whatever code you enter. If you paste third-party tags (for example Google Tag Manager, Google Analytics, or the Meta Pixel), those tags will load on the chat page and connect to their respective services according to your own configuration and their terms.
+The Settings → Tracking tab provides Header / Body / Footer code fields for the standalone chat pages. The plugin itself makes no call to any third party here — it only emits the JavaScript from the snippet you paste, through WordPress core's standard script-printing functions. If you paste third-party tags (for example Google Tag Manager, Google Analytics, or the Meta Pixel), those tags will load on the chat page and connect to their respective services according to your own configuration and their terms. Only the JavaScript in your snippet runs on the chat page; non-script parts such as a Tag Manager &lt;noscript&gt; fallback or &lt;meta&gt; verification tags are ignored there (the chat is a JavaScript-only app and the page is not indexed).
 
 == Screenshots ==
 
@@ -173,6 +173,14 @@ The Settings → Tracking tab provides Header / Body / Footer code fields that a
 5. The Getting Started admin page — twelve setup steps with completion tracking.
 
 == Changelog ==
+
+= 2.39.21 =
+* WordPress.org review compliance: the analytics/tracking code fields for the standalone chat page (Settings → Tracking) now emit their JavaScript through WordPress core's sanctioned script printers (wp_print_inline_script_tag() / wp_print_script_tag()) instead of printing the saved markup directly. Each &lt;script&gt; block in your snippet is parsed out and re-emitted the standard way; non-script parts (a Tag Manager &lt;noscript&gt; fallback, &lt;meta&gt; tags) are skipped, since the chat page is a JavaScript-only app and is not indexed. Your existing Tag Manager / analytics snippets keep working with no change. Plugin Check passes with zero errors.
+
+= 2.39.20 =
+* WordPress.org review compliance: the Knowledge Base content-type editor now sanitizes the free-form "restructure prompt" field on save (validates UTF-8 and strips control characters, matching the other AI-prompt fields) instead of persisting it only unslashed. The label, description and slug fields were already sanitized/validated; this closes the one field that was not.
+* WordPress.org review compliance: the per-campaign variant of the assistant-context cache transient key is now built as a single expression that begins with the plugin's zen_cortext_ prefix, so the prefix is unambiguous to static analysis. The stored key value is unchanged, so existing caches are unaffected.
+* WordPress.org review compliance: prefixed the file-scope variables in the two standalone full-page templates, the chat view they include, and uninstall.php with the zen_cortext_ prefix, since those files run in the global scope. (The variables in the admin view files are scoped to the render methods that include them and cannot leak to the global namespace.) No behavior change.
 
 = 2.39.19 =
 * WordPress.org review compliance: removed a one-time migration that authored a Google Tag Manager script snippet directly in the plugin's PHP source. Tracking/analytics code is now strictly admin-pasted via the Settings → Tracking Header/Body/Footer custom-code fields; the plugin no longer generates any script markup of its own. Existing installs keep whatever code they previously saved in those fields.
@@ -242,6 +250,9 @@ The Settings → Tracking tab provides Header / Body / Footer code fields that a
 * See the project's GitHub repository commit history for the full pre-1.0 development log.
 
 == Upgrade Notice ==
+
+= 2.39.20 =
+WordPress.org review compliance: stronger input sanitization on the Knowledge Base content-type editor and a clearer prefix on one internal cache key. No action required.
 
 = 2.39.11 =
 Fixes false "service unavailable" messages and admin alert emails that could fire after a successful visitor chat. Recommended update.

@@ -20,8 +20,8 @@ if (!defined('ABSPATH')) {
 // Register the plugin's public assets so the livechat handles exist, then
 // enqueue + print only those (no hand-written <link>/<script> tags). No
 // webfont is loaded — the plugin makes no external font request.
-$zc_shortcode = Zen_Cortext_Shortcode::get_instance();
-$zc_shortcode->register_assets();
+$zen_cortext_shortcode = Zen_Cortext_Shortcode::get_instance();
+$zen_cortext_shortcode->register_assets();
 wp_enqueue_style('zen-cortext-livechat');
 wp_enqueue_script('zen-cortext-livechat');
 wp_localize_script('zen-cortext-livechat', 'zenCortextLivechat', array(

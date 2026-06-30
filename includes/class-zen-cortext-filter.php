@@ -639,12 +639,17 @@ class Zen_Cortext_Filter {
             $rule = Zen_Cortext_Attribution::resolve($attribution);
         }
 
+        // Build the transient key as a single expression that always begins
+        // with the plugin-prefixed constant (the rule variant appends a
+        // suffix to the SAME prefixed base, never starts from a bare literal),
+        // so both the runtime key and Plugin Check's prefix sniff see the
+        // zen_cortext_ prefix at the front.
         $cache_key = self::ASSISTANT_CONTEXT_CACHE_KEY;
         if ($rule) {
             // Rule.updated_at participates in the key so a rule edit
             // invalidates the old cache automatically — no flush hook
             // needed. Orphaned entries expire on their own via TTL.
-            $cache_key .= '_rule_' . (int) $rule['id'] . '_' . md5((string) $rule['updated_at']);
+            $cache_key = self::ASSISTANT_CONTEXT_CACHE_KEY . '_rule_' . (int) $rule['id'] . '_' . md5((string) $rule['updated_at']);
         }
 
         if ($use_cache) {

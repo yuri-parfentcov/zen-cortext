@@ -186,11 +186,25 @@ class Zen_Cortext_KB_Types {
                 return new WP_Error('zen_cortext_types', "Row {$i} ({$slug}): label is required.");
             }
 
+            // restructure_prompt is a free-form AI prompt: it is sent to the
+            // LLM as text and never echoed as HTML (the editor renders it
+            // through esc_textarea()). Sanitize it like the other prompt
+            // fields (system/classify/survey templates) — drop invalid UTF-8
+            // and strip control characters while keeping tabs/newlines and any
+            // angle-bracket tokens a prompt may legitimately contain — rather
+            // than sanitize_textarea_field(), which would strip those tokens.
+            // The value is already unslashed at the AJAX layer (the whole JSON
+            // payload is wp_unslash()'d before json_decode), matching how the
+            // label/description fields above are treated, so no wp_unslash()
+            // here.
+            $prompt = wp_check_invalid_utf8($prompt);
+            $prompt = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $prompt);
+
             $clean[] = array(
                 'slug'               => $slug,
                 'label'              => sanitize_text_field($label),
                 'description'        => sanitize_textarea_field($desc),
-                'restructure_prompt' => wp_unslash($prompt), // textareas; preserve newlines + free-form punctuation.
+                'restructure_prompt' => (string) $prompt,
             );
             $seen_slugs[$slug] = true;
         }

@@ -20,45 +20,103 @@ class Zen_Cortext_Shortcode {
     }
 
     /**
-     * Custom code injection for the standalone chat templates.
+     * Analytics / tracking code injection for the standalone chat templates.
      *
      * The full-page chat (/talk/) owns the whole document and deliberately
      * skips wp_head()/wp_footer(), so a site's normal header/footer injectors
      * (theme, GTM4WP, "Insert Headers and Footers", analytics plugins) never
-     * fire there. These three options let the admin paste ANY markup — GTM,
-     * GA4, Meta Pixel, verification meta tags, etc. — into the head, after the
-     * opening <body>, and before </body> respectively. Theme-independent.
+     * fire there. Three options let the admin paste their tracking snippet for
+     * the head, just after the opening <body>, and before </body>.
      *
-     * The stored code is echoed verbatim by design (it is markup/script). It is
-     * sanitized on save in Zen_Cortext_Admin::sanitize_custom_code(): stored raw
-     * only for users with the unfiltered_html capability, otherwise filtered
-     * through wp_kses_post() — the same model core uses for the Custom HTML
-     * widget and that the header/footer-code plugins use.
+     * Output is NOT a raw echo. Each <script> block in the saved snippet is
+     * emitted through WordPress core's sanctioned script printers (WP 5.7+):
+     *   - wp_print_script_tag()        for external loaders (<script src=...>)
+     *   - wp_print_inline_script_tag() for inline JS bodies
+     * Any non-<script> markup a snippet may also contain (a GTM <noscript>
+     * iframe, <meta> verification tags) is intentionally dropped: the chat page
+     * is a JavaScript-only app, so a <noscript> fallback can never apply, and
+     * the page is noindex, so verification metas are irrelevant here.
+     *
+     * The saved value is capability-gated in Zen_Cortext_Admin::sanitize_custom_code()
+     * (verbatim only for unfiltered_html, wp_kses_post() otherwise).
      */
     public static function print_header_code() {
-        $code = (string) get_option('zen_cortext_header_code', '');
-        if (trim($code) === '') return;
-        echo "\n";
-        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Raw by design (same model as WP core's Custom HTML widget). The value is stored verbatim by Zen_Cortext_Admin::sanitize_custom_code() ONLY when the saving user holds `unfiltered_html` (admins single-site / super admins multisite); every other role's input is run through wp_kses_post() at save. This field exists to inject analytics/tracking <script> (GTM/GA4/Pixel) onto the standalone chat page, which bypasses wp_head(); escaping at output would strip exactly that and defeat the feature.
-        echo "\n";
+        self::emit_tracking_scripts((string) get_option('zen_cortext_header_code', ''));
     }
 
-    /** Custom code printed immediately after the opening <body> tag. */
+    /** Tracking scripts emitted immediately after the opening <body> tag. */
     public static function print_body_code() {
-        $code = (string) get_option('zen_cortext_body_code', '');
-        if (trim($code) === '') return;
-        echo "\n";
-        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Raw by design (same model as WP core's Custom HTML widget). The value is stored verbatim by Zen_Cortext_Admin::sanitize_custom_code() ONLY when the saving user holds `unfiltered_html` (admins single-site / super admins multisite); every other role's input is run through wp_kses_post() at save. This field exists to inject analytics/tracking <script> (GTM/GA4/Pixel) onto the standalone chat page, which bypasses wp_head(); escaping at output would strip exactly that and defeat the feature.
-        echo "\n";
+        self::emit_tracking_scripts((string) get_option('zen_cortext_body_code', ''));
     }
 
-    /** Custom code printed just before the closing </body> tag. */
+    /** Tracking scripts emitted just before the closing </body> tag. */
     public static function print_footer_code() {
-        $code = (string) get_option('zen_cortext_footer_code', '');
-        if (trim($code) === '') return;
-        echo "\n";
-        echo $code; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Raw by design (same model as WP core's Custom HTML widget). The value is stored verbatim by Zen_Cortext_Admin::sanitize_custom_code() ONLY when the saving user holds `unfiltered_html` (admins single-site / super admins multisite); every other role's input is run through wp_kses_post() at save. This field exists to inject analytics/tracking <script> (GTM/GA4/Pixel) onto the standalone chat page, which bypasses wp_head(); escaping at output would strip exactly that and defeat the feature.
-        echo "\n";
+        self::emit_tracking_scripts((string) get_option('zen_cortext_footer_code', ''));
+    }
+
+    /**
+     * Parse a saved tracking snippet and emit each <script> block through core's
+     * sanctioned printers. Never echoes the raw string. See print_header_code()
+     * for the full rationale (and why non-<script> markup is dropped).
+     */
+    private static function emit_tracking_scripts($code) {
+        $code = (string) $code;
+        if (trim($code) === '') {
+            return;
+        }
+        // Match each <script ...>...</script> block (attributes + inline body).
+        if (!preg_match_all('#<script\b([^>]*)>(.*?)</script>#is', $code, $blocks, PREG_SET_ORDER)) {
+            return;
+        }
+        foreach ($blocks as $block) {
+            $attrs = self::parse_script_attributes((string) $block[1]);
+            if (!empty($attrs['src'])) {
+                // External loader (e.g. gtag.js). Browsers ignore any inline
+                // body when src is present, so only the external tag is printed.
+                wp_print_script_tag($attrs);
+                continue;
+            }
+            $js = trim((string) $block[2]);
+            if ($js !== '') {
+                wp_print_inline_script_tag($js);
+            }
+        }
+    }
+
+    /**
+     * Extract the safe subset of a <script> tag's attributes (src, async, defer,
+     * type, id) for re-emission through wp_print_script_tag(), which escapes the
+     * src and validates the rest.
+     */
+    private static function parse_script_attributes($attr_string) {
+        $attrs = array();
+        if (preg_match('#\bsrc\s*=\s*("([^"]*)"|\'([^\']*)\')#i', $attr_string, $m)) {
+            $src = '' !== $m[2] ? $m[2] : (isset($m[3]) ? $m[3] : '');
+            $src = html_entity_decode($src, ENT_QUOTES);
+            if ('' !== $src) {
+                $attrs['src'] = $src; // wp_print_script_tag() runs this through esc_url().
+            }
+        }
+        foreach (array('async', 'defer', 'nomodule') as $flag) {
+            if (preg_match('#\b' . $flag . '\b#i', $attr_string)) {
+                $attrs[$flag] = true;
+            }
+        }
+        if (preg_match('#\btype\s*=\s*("([^"]*)"|\'([^\']*)\')#i', $attr_string, $m)) {
+            $type = '' !== $m[2] ? $m[2] : (isset($m[3]) ? $m[3] : '');
+            $type = sanitize_text_field(html_entity_decode($type, ENT_QUOTES));
+            if ('' !== $type && 'text/javascript' !== $type) {
+                $attrs['type'] = $type;
+            }
+        }
+        if (preg_match('#\bid\s*=\s*("([^"]*)"|\'([^\']*)\')#i', $attr_string, $m)) {
+            $id = '' !== $m[2] ? $m[2] : (isset($m[3]) ? $m[3] : '');
+            $id = sanitize_text_field(html_entity_decode($id, ENT_QUOTES));
+            if ('' !== $id) {
+                $attrs['id'] = $id;
+            }
+        }
+        return $attrs;
     }
 
     const PAGE_TEMPLATE_SLUG = 'zen-cortext-chat-page.php';
@@ -211,7 +269,10 @@ class Zen_Cortext_Shortcode {
             $this->assets_enqueued = true;
         }
 
-        $intro = get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card());
+        // Consumed by public/views/chat.php (prefixed to satisfy the
+        // PrefixAllGlobals naming check, since that view is also loaded at
+        // global scope by the standalone full-page template).
+        $zen_cortext_intro = get_option('zen_cortext_intro_card', Zen_Cortext_Defaults::intro_card());
 
         ob_start();
         // chat.php is a thin controller that calls the template renderer.

@@ -35,7 +35,7 @@ global $wpdb;
 /* ------------------------------------------------------------------
    1. Drop every database table the plugin creates.
    ------------------------------------------------------------------ */
-$tables = array(
+$zen_cortext_tables = array(
     $wpdb->prefix . 'zen_cortext_kb',
     $wpdb->prefix . 'zen_cortext_artifacts',
     $wpdb->prefix . 'zen_cortext_chats',
@@ -48,11 +48,11 @@ $tables = array(
     $wpdb->prefix . 'zen_cortext_api_keys',
     $wpdb->prefix . 'zen_cortext_push_subscriptions',
 );
-foreach ($tables as $t) {
+foreach ($zen_cortext_tables as $zen_cortext_t) {
     // Each table name is composed from a constant $wpdb prefix and a
     // literal suffix — no user input — so the interpolation is safe.
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange -- intentional DROP TABLE at uninstall to honor WP's "delete plugin" contract; required for the clean-uninstall behavior advertised in the readme.
-    $wpdb->query("DROP TABLE IF EXISTS {$t}");
+    $wpdb->query("DROP TABLE IF EXISTS {$zen_cortext_t}");
 }
 
 /* ------------------------------------------------------------------
@@ -94,35 +94,35 @@ $wpdb->query(
    Includes the writable copies of chat.css / templates / version
    snapshots created by the chat editor. wp_upload_dir() respects
    any host-specific overrides (e.g. multisite layout, S3 plugins). */
-$uploads = wp_upload_dir();
-$zce_dir = trailingslashit($uploads['basedir']) . 'zen-cortext';
-if (is_dir($zce_dir)) {
-    $rrm = function ($path) use (&$rrm) {
+$zen_cortext_uploads = wp_upload_dir();
+$zen_cortext_zce_dir = trailingslashit($zen_cortext_uploads['basedir']) . 'zen-cortext';
+if (is_dir($zen_cortext_zce_dir)) {
+    $zen_cortext_rrm = function ($path) use (&$zen_cortext_rrm) {
         if (!is_dir($path)) return;
         foreach (scandir($path) as $e) {
             if ($e === '.' || $e === '..') continue;
             $sub = $path . '/' . $e;
             // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir,WordPress.WP.AlternativeFunctions.unlink_unlink -- recursive cleanup of plugin-owned uploads directory at uninstall; WP_Filesystem requires runtime credentials that aren't available in uninstall context.
-            if (is_dir($sub)) { $rrm($sub); @rmdir($sub); }
+            if (is_dir($sub)) { $zen_cortext_rrm($sub); @rmdir($sub); }
             // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- removing file inside plugin-owned uploads dir at uninstall.
             else              { @unlink($sub); }
         }
         @rmdir($path); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- removing plugin-owned uploads dir at uninstall.
     };
-    $rrm($zce_dir);
+    $zen_cortext_rrm($zen_cortext_zce_dir);
 }
 
 /* ------------------------------------------------------------------
    6. Multisite: repeat options/transients/usermeta sweep on every blog.
    ------------------------------------------------------------------ */
 if (is_multisite()) {
-    $blog_ids = $wpdb->get_col("SELECT blog_id FROM {$wpdb->blogs}");
-    foreach ($blog_ids as $blog_id) {
-        switch_to_blog((int) $blog_id);
-        $opts = $wpdb->prefix . 'options';
-        $wpdb->query("DELETE FROM {$opts} WHERE option_name LIKE 'zen_cortext\\_%'");
+    $zen_cortext_blog_ids = $wpdb->get_col("SELECT blog_id FROM {$wpdb->blogs}");
+    foreach ($zen_cortext_blog_ids as $zen_cortext_blog_id) {
+        switch_to_blog((int) $zen_cortext_blog_id);
+        $zen_cortext_opts = $wpdb->prefix . 'options';
+        $wpdb->query("DELETE FROM {$zen_cortext_opts} WHERE option_name LIKE 'zen_cortext\\_%'");
         $wpdb->query(
-            "DELETE FROM {$opts}
+            "DELETE FROM {$zen_cortext_opts}
              WHERE option_name LIKE '\\_transient\\_zen\\_cortext\\_%'
                 OR option_name LIKE '\\_transient\\_timeout\\_zen\\_cortext\\_%'
                 OR option_name LIKE '\\_transient\\_zce\\_%'
